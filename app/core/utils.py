@@ -4,8 +4,8 @@ import toml
 
 
 def get_version():
-    pyproject_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
-
+    pyproject_path = Path(__file__).resolve().parent.parent.parent / "pyproject.toml"
+    print(pyproject_path)
     try:
         with open(pyproject_path, "r") as f:
             data = toml.loads(f.read())

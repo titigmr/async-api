@@ -1,15 +1,19 @@
 import http
+import json
 import logging
 import uuid
 from typing import Annotated
 
-from core.config import settings
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db_session
+from app.models.task import Task
 from app.schema import (
+    QueueData,
+    QueueTaskSubmission,
     TaskCallback,
     TaskErrorResponse,
     TaskPolling,
@@ -17,13 +21,13 @@ from app.schema import (
     TaskResponse,
 )
 from app.schema.enum import ErrorEnum
+from app.schema.task import TaskData
 from app.service.queue_service import send_task_to_queue
 from app.service.task_service import add_task_to_db, get_task_from_db
 
-router = APIRouter(prefix="/tasks", tags=["Tasks"])
+router = APIRouter(tags=["Tasks"])
 callback_router = APIRouter()
 
-# Configuration du logger pour voir les erreurs dans les logs uvicorn
 logger = logging.getLogger("uvicorn.error")
 
 
@@ -36,7 +40,7 @@ def receive_callback(body: TaskCallback):
 
 
 @router.post(
-    "/",
+    "/services/{service}/tasks",
     status_code=status.HTTP_201_CREATED,
     callbacks=callback_router.routes,
     response_model=TaskResponse,
@@ -60,6 +64,13 @@ Crée une tâche asynchrone pour un service donné.
 """,
 )
 async def create_task(
+    service: Annotated[
+        str,
+        Path(
+            ...,
+            description="Nom du service pour lequel créer la tâche. Doit être dans la liste des services autorisés.",
+        ),
+    ],
     task: Annotated[
         TaskRequest,
         Body(
@@ -93,11 +104,8 @@ async def create_task(
 ):
     """
     Crée une tâche pour le service demandé.
-    - **service** : nom du service à appeler
-    - **body** : paramètres à passer au service
-    - **callback** : URL de rappel optionnelle
     """
-    if task.service not in settings.SERVICE_LIST:
+    if service not in settings.SERVICE_LIST:
         return JSONResponse(
             status_code=404,
             content=TaskErrorResponse(
@@ -107,26 +115,40 @@ async def create_task(
                 )
             ).model_dump(),
         )
+
     task_id = str(uuid.uuid4())
+
     try:
-        background_tasks.add_task(send_task_to_queue, task.model_dump_json())
-        add_task_to_db(db, task.model_dump())
-    except Exception as e:
-        logger.exception(f"Erreur lors de la création de la tâche : {e}")
+        queue_message = QueueTaskSubmission(
+            taskId=task_id, data=QueueData(messageType="submission", body=task.body)
+        )
+        background_tasks.add_task(send_task_to_queue, queue_message.model_dump())
+
+        task_obj = Task(
+            task_id=task_id,
+            client_id="default",
+            service=service,
+            status="pending",
+            request=task.body,
+            callback=task.callback.model_dump() if task.callback else None,
+        )
+        add_task_to_db(db, json.loads(task_obj.model_dump_json()))
+    except Exception as error:
+        logger.exception(f"Erreur lors de la création de la tâche : {error}")
         return JSONResponse(
             status_code=500,
             content=TaskErrorResponse(
                 error=TaskErrorResponse.Error(
                     number=500_001,
-                    description=http.HTTPStatus.INTERNAL_SERVER_ERROR.description,
+                    description=str(error),
                 )
-            ).model_dump_(),
+            ).model_dump(),
         )
-    return TaskResponse(task_id=task_id, status="success")
+    return TaskResponse(data=TaskData(task_id=task_id, status="success"))
 
 
 @router.get(
-    "/{task_id}",
+    "/services/{service}/tasks/{task_id}",
     response_model=TaskPolling,
     responses={
         404: {
@@ -146,6 +168,13 @@ Permet de récupérer le statut d'une tâche asynchrone via son identifiant.
 """,
 )
 async def get_task(
+    service: Annotated[
+        str,
+        Path(
+            ...,
+            description="Nom du service pour lequel récupérer la tâche. Doit être dans la liste des services autorisés.",
+        ),
+    ],
     task_id: Annotated[
         str, Path(..., description="Identifiant unique de la tâche à récupérer.")
     ],
@@ -156,7 +185,7 @@ async def get_task(
     - **task_id** : identifiant unique de la tâche
     """
     try:
-        task = get_task_from_db(db, task_id)
+        task = get_task_from_db(db, task_id, service=service)
         if not task:
             return JSONResponse(
                 status_code=404,

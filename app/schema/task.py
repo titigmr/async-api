@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 from pydantic.networks import AmqpDsn, HttpUrl
@@ -29,8 +29,7 @@ class Callback(BaseModel):
 
 
 class TaskRequest(BaseModel):
-    service: str = Field(..., description="Nom du service à appeler")
-    body: Any = Field(..., description="Paramètres à transmettre au service cible")
+    body: dict = Field(..., description="Paramètres à transmettre au service cible")
     callback: None | Callback = Field(
         default=None, description="Informations de callback optionnelles"
     )

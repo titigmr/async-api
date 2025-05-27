@@ -11,5 +11,7 @@ def create_task_record(db: Session, task_data: dict) -> Task:
     return task
 
 
-def get_task_by_id(db: Session, task_id: str):
-    return db.query(Task).filter(Task.task_id == task_id).first()
+def get_task_by_id(db: Session, task_id: str, service: str):
+    return (
+        db.query(Task).filter(Task.task_id == task_id, Task.service == service).first()
+    )

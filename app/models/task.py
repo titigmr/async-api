@@ -1,25 +1,28 @@
 from datetime import datetime
+from typing import Any, Dict, Optional
 
-from sqlalchemy import JSON, Column, DateTime, Float, Integer, String
+from sqlalchemy import Column
+from sqlalchemy.dialects.postgresql import JSON
+from sqlmodel import Field, SQLModel
 
-from app.core.database import Base
 
-
-class Task(Base):
+class Task(SQLModel, table=True):
     __tablename__ = "tasks"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    task_id = Column(String, unique=True, nullable=False, index=True)
-    client_id = Column(String, nullable=False)
-    service = Column(String, nullable=False)
-    status = Column(String, nullable=False, default="pending")
-    request = Column(JSON, nullable=False)
-    error_message = Column(String, nullable=True)
-    progress = Column(Float, nullable=False, default=0.0)
-    response = Column(String, nullable=True)
-    callback = Column(JSON, nullable=True)
-    submition_date = Column(DateTime, nullable=False, default=datetime.now())
-    start_date = Column(DateTime, nullable=True)
-    end_date = Column(DateTime, nullable=True)
-    notification_status = Column(String, nullable=True)
-    worker_host = Column(String, nullable=True)
+    id: Optional[int] = Field(default=None, primary_key=True, index=True)
+    task_id: str = Field(index=True, nullable=False, unique=True)
+    client_id: str = Field(nullable=False)
+    service: str = Field(nullable=False)
+    status: str = Field(default="pending", nullable=False)
+    request: Dict[str, Any] = Field(sa_column=Column(JSON, nullable=False))
+    error_message: Optional[str] = Field(default=None)
+    progress: float = Field(default=0.0, nullable=False)
+    response: Optional[str] = Field(default=None)
+    callback: Optional[Dict[str, Any]] = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
+    submition_date: datetime = Field(default_factory=datetime.now, nullable=False)
+    start_date: Optional[datetime] = Field(default=None)
+    end_date: Optional[datetime] = Field(default=None)
+    notification_status: Optional[str] = Field(default=None)
+    worker_host: Optional[str] = Field(default=None)

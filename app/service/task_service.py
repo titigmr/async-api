@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from app.crud.task import create_task_record, get_task_by_id
 
 
-def get_task_from_db(db: Session, task_id: str):
-    return get_task_by_id(db, task_id)
+def get_task_from_db(db: Session, task_id: str, service: str):
+    return get_task_by_id(db, task_id, service=service)
 
 
 def add_task_to_db(db: Session, task_data: dict):
