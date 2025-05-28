@@ -23,7 +23,18 @@ services:
       - "5432:5432"
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:management
+    container_name: rabbitmq
+    restart: always
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - 5672:5672
+      - 15672:15672
+      - 8080:8080
+    environment:
+      RABBITMQ_DEFAULT_USER: kalo
+      RABBITMQ_DEFAULT_PASS: kalo
+volumes:
+  rabbitmq-lib:
+    driver: local
+  rabbitmq-log:
+    driver: local

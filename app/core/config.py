@@ -1,11 +1,10 @@
-import socket
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
-    API_URLS: list[dict] = [{"url": socket.gethostname()}]
     SERVICE_LIST: list[str] = ["transcription", "ocr", "capture_audio"]
     PROJECT_NAME: str = "Task API"
     DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/tasks"
@@ -16,3 +15,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+ServiceLiteral = Literal[tuple(settings.SERVICE_LIST)]
+
+
+__all__ = ["settings", "ServiceLiteral"]

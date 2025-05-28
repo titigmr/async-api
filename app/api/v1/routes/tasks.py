@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
+from app.core.config import ServiceLiteral, settings
 from app.core.database import get_db_session
 from app.models.task import Task
 from app.schema import (
@@ -65,7 +65,7 @@ Crée une tâche asynchrone pour un service donné.
 )
 async def create_task(
     service: Annotated[
-        str,
+        ServiceLiteral,
         Path(
             ...,
             description="Nom du service pour lequel créer la tâche. Doit être dans la liste des services autorisés.",
@@ -80,14 +80,12 @@ async def create_task(
                 "default": {
                     "summary": "Exemple de création de tâche",
                     "value": {
-                        "service": "mon_service",
                         "body": {"param1": "valeur1", "param2": 42},
                         "callback": {},
                     },
                     "callback": {
                         "summary": "Exemple de création de tâche",
                         "value": {
-                            "service": "mon_service",
                             "body": {"param1": "valeur1", "param2": 42},
                             "callback": {
                                 "url": "https://monapp/callback",
@@ -120,9 +118,9 @@ async def create_task(
 
     try:
         queue_message = QueueTaskSubmission(
-            taskId=task_id, data=QueueData(messageType="submission", body=task.body)
+            task_id=task_id, data=QueueData(message_type="submission", body=task.body)
         )
-        background_tasks.add_task(send_task_to_queue, queue_message.model_dump())
+        background_tasks.add_task(send_task_to_queue, queue_message)
 
         task_obj = Task(
             task_id=task_id,
