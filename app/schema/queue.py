@@ -8,6 +8,6 @@ class QueueData(BaseModel):
     body: Dict[str, Any] = Field(..., description="Payload de la tâche")
 
 
-class QueueTaskSubmission(BaseModel):
+class QueueTask(BaseModel):
     task_id: str = Field(..., description="Identifiant unique de la tâche")
     data: QueueData = Field(..., description="Données de la tâche à soumettre")

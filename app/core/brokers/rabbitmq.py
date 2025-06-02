@@ -1,6 +1,7 @@
 from kombu import Connection, Producer, Queue
 
 from app.core.config import settings
+from app.schema import QueueTask
 from app.schema.broker import Broker
 
 
@@ -26,15 +27,17 @@ class RabbitMQBroker(Broker):
         self.connection.connect()
         self.connection.release()
 
-    def add_task(self, task: Task):
+    def add_task(self, task: QueueTask):
         """Add a task to the specified service queue."""
         if not self.producer:
             self.setup()
-        queue = self.queues[service]
+        queue = task.service
+        if queue not in self.queues:
+            raise ValueError(f"Service {queue} is not registered in the broker.")
         self.producer.publish(
             task,
             exchange=queue.exchange,
-            routing_key=service,
+            routing_key=queue.routing_key,
             serializer="json",
             declare=[queue],
         )

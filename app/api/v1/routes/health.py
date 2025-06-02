@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/health",
+    "/healthz",
     response_model=HealthResponse,
     summary="Vérifie la santé de l'API, DB et Broker",
 )

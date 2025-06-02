@@ -8,6 +8,6 @@ __version__, __name__ = get_version()
 
 app = FastAPI(title=__name__, version=__version__, summary=settings.PROJECT_DESCRIPTION)
 
-app.include_router(services.router, prefix="/api/v1", tags=["Services"])
-app.include_router(tasks.router, prefix="/api/v1", tags=["Tasks"])
-app.include_router(health.router, prefix="/api", tags=["Health"])
+app.include_router(services.router, prefix="/v1", tags=["Services"])
+app.include_router(tasks.router, prefix="/v1", tags=["Tasks"])
+app.include_router(health.router, prefix="/", tags=["Health"])

@@ -4,7 +4,7 @@ import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, Path, status
+from fastapi import APIRouter, Body, Depends, Path, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,7 @@ from app.core.database import get_db_session
 from app.models.task import Task
 from app.schema import (
     QueueData,
-    QueueTaskSubmission,
+    QueueTask,
     TaskCallback,
     TaskErrorResponse,
     TaskPolling,
@@ -97,7 +97,6 @@ async def create_task(
             },
         ),
     ],
-    background_tasks: BackgroundTasks,
     db: Annotated[Session, Depends(get_db_session)],
 ):
     """
@@ -117,10 +116,10 @@ async def create_task(
     task_id = str(uuid.uuid4())
 
     try:
-        queue_message = QueueTaskSubmission(
+        queue_message = QueueTask(
             task_id=task_id, data=QueueData(message_type="submission", body=task.body)
         )
-        background_tasks.add_task(send_task_to_queue, queue_message)
+        send_task_to_queue(queue_message)
 
         task_obj = Task(
             task_id=task_id,
