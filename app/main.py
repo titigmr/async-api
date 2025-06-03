@@ -10,4 +10,4 @@ app = FastAPI(title=__name__, version=__version__, summary=settings.PROJECT_DESC
 
 app.include_router(services.router, prefix="/v1", tags=["Services"])
 app.include_router(tasks.router, prefix="/v1", tags=["Tasks"])
-app.include_router(health.router, prefix="/", tags=["Health"])
+app.include_router(health.router, tags=["Health"])

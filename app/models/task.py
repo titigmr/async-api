@@ -7,8 +7,6 @@ from sqlmodel import Field, SQLModel
 
 
 class Task(SQLModel, table=True):
-    __tablename__ = "tasks"
-
     id: Optional[int] = Field(default=None, primary_key=True, index=True)
     task_id: str = Field(index=True, nullable=False, unique=True)
     client_id: str = Field(nullable=False)

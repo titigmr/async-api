@@ -1,19 +1,13 @@
 import http
-import json
 import logging
-import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, status
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-
+from app.core.utils import generate_error_response
 from app.core.config import ServiceLiteral, settings
 from app.core.database import get_db_session
-from app.models.task import Task
 from app.schema import (
-    QueueData,
-    QueueTask,
     TaskCallback,
     TaskErrorResponse,
     TaskPolling,
@@ -21,9 +15,7 @@ from app.schema import (
     TaskResponse,
 )
 from app.schema.enum import ErrorEnum
-from app.schema.task import TaskData
-from app.service.queue_service import send_task_to_queue
-from app.service.task_service import add_task_to_db, get_task_from_db
+from app.service.task_service import poll_task, submit_task
 
 router = APIRouter(tags=["Tasks"])
 callback_router = APIRouter()
@@ -76,25 +68,6 @@ async def create_task(
         Body(
             ...,
             description="Représente la tâche à créer. Inclut le nom du service, les paramètres, et éventuellement un callback.",
-            examples={
-                "default": {
-                    "summary": "Exemple de création de tâche",
-                    "value": {
-                        "body": {"param1": "valeur1", "param2": 42},
-                        "callback": {},
-                    },
-                    "callback": {
-                        "summary": "Exemple de création de tâche",
-                        "value": {
-                            "body": {"param1": "valeur1", "param2": 42},
-                            "callback": {
-                                "url": "https://monapp/callback",
-                                "type": "http",
-                            },
-                        },
-                    },
-                }
-            },
         ),
     ],
     db: Annotated[Session, Depends(get_db_session)],
@@ -103,45 +76,13 @@ async def create_task(
     Crée une tâche pour le service demandé.
     """
     if service not in settings.SERVICE_LIST:
-        return JSONResponse(
-            status_code=404,
-            content=TaskErrorResponse(
-                error=TaskErrorResponse.Error(
-                    number=404_001,
-                    description=ErrorEnum.SERVICE_NOT_FOUND.value,
-                )
-            ).model_dump(),
-        )
-
-    task_id = str(uuid.uuid4())
-
+        return generate_error_response(404001)
     try:
-        queue_message = QueueTask(
-            task_id=task_id, data=QueueData(message_type="submission", body=task.body)
-        )
-        send_task_to_queue(queue_message)
-
-        task_obj = Task(
-            task_id=task_id,
-            client_id="default",
-            service=service,
-            status="pending",
-            request=task.body,
-            callback=task.callback.model_dump() if task.callback else None,
-        )
-        add_task_to_db(db, json.loads(task_obj.model_dump_json()))
+        task_data = submit_task(db, task, service)
+        return TaskResponse(status="success", data=task_data)
     except Exception as error:
         logger.exception(f"Erreur lors de la création de la tâche : {error}")
-        return JSONResponse(
-            status_code=500,
-            content=TaskErrorResponse(
-                error=TaskErrorResponse.Error(
-                    number=500_001,
-                    description=str(error),
-                )
-            ).model_dump(),
-        )
-    return TaskResponse(data=TaskData(task_id=task_id, status="success"))
+        return generate_error_response(501001)
 
 
 @router.get(
@@ -161,7 +102,7 @@ async def create_task(
     description="""
 Permet de récupérer le statut d'une tâche asynchrone via son identifiant.
 
-- **task_id** : identifiant unique de la tâche à interroger
+- **task_id** : identifiant unique de la tâche à interroger
 """,
 )
 async def get_task(
@@ -172,9 +113,7 @@ async def get_task(
             description="Nom du service pour lequel récupérer la tâche. Doit être dans la liste des services autorisés.",
         ),
     ],
-    task_id: Annotated[
-        str, Path(..., description="Identifiant unique de la tâche à récupérer.")
-    ],
+    task_id: Annotated[str, Path(..., description="Identifiant unique de la tâche à récupérer.")],
     db: Annotated[Session, Depends(get_db_session)],
 ):
     """
@@ -182,33 +121,10 @@ async def get_task(
     - **task_id** : identifiant unique de la tâche
     """
     try:
-        task = get_task_from_db(db, task_id, service=service)
-        if not task:
-            return JSONResponse(
-                status_code=404,
-                content=TaskErrorResponse(
-                    error=TaskErrorResponse.Error(
-                        number=404_001,
-                        description=ErrorEnum.SERVICE_NOT_FOUND.value,
-                    )
-                ).model_dump(),
-            )
-        return TaskPolling(
-            status="success",
-            data=TaskPolling.TaskData(
-                task_id=task.task_id,
-                status=task.status,
-                submission_date=task.submission_date,
-            ),
-        )
+        task_info = poll_task(db, task_id, service=service)
+        if not task_info:
+            return generate_error_response(404001)
+        return TaskPolling(status="success", data=task_info)
     except Exception as error:
         logger.exception(f"Erreur lors de la récupération de la tâche : {error}")
-        return JSONResponse(
-            status_code=500,
-            content=TaskErrorResponse(
-                error=TaskErrorResponse.Error(
-                    number=500_001,
-                    description=http.HTTPStatus.INTERNAL_SERVER_ERROR.description,
-                )
-            ).model_dump(),
-        )
+        return generate_error_response(500001)

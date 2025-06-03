@@ -1,4 +1,5 @@
 from app.core.brokers.rabbitmq import RabbitMQBroker
+from app.schema.queue import QueueTask
 from app.core.config import settings
 
 
@@ -10,6 +11,6 @@ def get_broker():
         raise ValueError(f"Unknown broker type: {settings.BROKER_TYPE}")
 
 
-def send_task_to_queue(task_data: dict):
+def send_task_to_queue(task_data: QueueTask):
     broker = get_broker()
     broker.add_task(task_data)

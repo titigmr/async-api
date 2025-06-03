@@ -18,7 +18,7 @@ router = APIRouter()
     summary="Vérifie la santé de l'API, DB et Broker",
 )
 def health_check(db: Annotated[Session, Depends(get_db_session)]):
-    components = {}
+    components: dict = {}
 
     try:
         db.execute(text("SELECT 1"))
@@ -41,10 +41,6 @@ def health_check(db: Annotated[Session, Depends(get_db_session)]):
         broker_details = str(error)
     components["broker"] = HealthComponent(status=broker_status, details=broker_details)
 
-    global_status = (
-        "ok"
-        if all(component.status == "ok" for component in components.values())
-        else "error"
-    )
+    global_status = "ok" if all(component.status == "ok" for component in components.values()) else "error"
 
     return HealthResponse(status=global_status, components=components)
