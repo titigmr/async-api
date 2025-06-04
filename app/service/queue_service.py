@@ -1,16 +1,18 @@
 from app.core.brokers.rabbitmq import RabbitMQBroker
 from app.schema.queue import QueueTask
-from app.core.config import settings
+
+_broker_instance: RabbitMQBroker | None = None
 
 
-def get_broker():
-    """Factory function to get the broker instance based on settings."""
-    if settings.BROKER_TYPE == "rabbitmq":
-        return RabbitMQBroker()
-    else:
-        raise ValueError(f"Unknown broker type: {settings.BROKER_TYPE}")
+def get_broker() -> RabbitMQBroker:
+    """Retourne toujours la même instance de broker (singleton simple)."""
+    global _broker_instance
+    if _broker_instance is None:
+        _broker_instance = RabbitMQBroker()
+        _broker_instance.setup()
+    return _broker_instance
 
 
-def send_task_to_queue(task_data: QueueTask):
-    broker = get_broker()
-    broker.add_task(task_data)
+def send_task_to_queue(task_data: QueueTask, service: str) -> None:
+    broker: RabbitMQBroker = get_broker()
+    broker.add_task(task=task_data, service=service)

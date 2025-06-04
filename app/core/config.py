@@ -1,5 +1,3 @@
-from typing import Literal
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,7 +14,5 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-ServiceLiteral = Literal[tuple(settings.SERVICE_LIST)]
 
-
-__all__ = ["settings", "ServiceLiteral"]
+__all__ = ["settings"]

@@ -1,7 +1,7 @@
 from .callback import TaskCallback
 from .health import HealthComponent, HealthResponse
 from .queue import QueueData, QueueTask
-from .task import TaskErrorResponse, TaskPolling, TaskRequest, TaskResponse, TaskData
+from .task import TaskData, TaskErrorResponse, TaskRequest, TaskResponse
 
 __all__ = [
     "TaskRequest",
@@ -9,7 +9,6 @@ __all__ = [
     "TaskResponse",
     "TaskErrorResponse",
     "TaskData",
-    "TaskPolling",
     "TaskCallback",
     "QueueData",
     "HealthComponent",
