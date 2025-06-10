@@ -9,8 +9,8 @@ const RABBITMQ_USER = process.env.RABBITMQ_USER || 'kalo';
 const RABBITMQ_PASSWORD = process.env.RABBITMQ_PASSWORD || 'kalo';
 const LISTENER_COUNT = Number(process.env.LISTENER_COUNT) || 5;
 
-const IN_QUEUE_NAME = process.env.IN_QUEUE_NAME || 'my_queue_in';
-const OUT_QUEUE_NAME = process.env.OUT_QUEUE_NAME ||'my_queue_out';
+const IN_QUEUE_NAME = process.env.IN_QUEUE_NAME || 'ocr';
+const OUT_QUEUE_NAME = process.env.OUT_QUEUE_NAME ||'toto';
 
 //------------------------
 // FRAMEWORK
@@ -41,31 +41,31 @@ class MessageSender {
         await connection.close();
     }
 
-    async sendStartMessage(taskId) {
+    async sendStartMessage(task_id) {
         await this._sendMessage({
-            taskId: taskId,
+            task_id: task_id,
             data: {
-                messageType: "started",
+                message_type: "started",
                 hostName: os.hostname()
             }
         }) 
     }
 
-    async sendSuccessMessage(taskId, result) {
+    async sendSuccessMessage(task_id, result) {
         await this._sendMessage({
-            taskId: taskId,
+            task_id: task_id,
             data: {
-                messageType: "success",
+                message_type: "success",
                 response: result
             }
         }) 
     }
 
-    async sendFailureMessage(taskId, cause) {
+    async sendFailureMessage(task_id, cause) {
         await this._sendMessage({
-            taskId: taskId,
+            task_id: task_id,
             data: {
-                messageType: "failure",
+                message_type: "failure",
                 errorMessage: cause
             }
         }) 
@@ -131,12 +131,12 @@ class TaskManager {
             if (submissionMessage) {
                 console.log("[Listener ${channelIndex}] Submission : ",submissionMessage);
                 try {
-                    await this.messageSender.sendStartMessage(submissionMessage.taskId);
+                    await this.messageSender.sendStartMessage(submissionMessage.task_id);
                     let task = this.taskFactory();
                     let result = await task.run(submissionMessage.data.body);
-                    await this.messageSender.sendSuccessMessage(submissionMessage.taskId,result);
+                    await this.messageSender.sendSuccessMessage(submissionMessage.task_id,result);
                 } catch (err) {
-                    await this.messageSender.sendFailureMessage(submissionMessage.taskId,err);
+                    await this.messageSender.sendFailureMessage(submissionMessage.task_id,err);
                 }
             } else {
                 console.error(`[Listener ${channelIndex}] Message invalide : ${content}`);
@@ -153,7 +153,7 @@ class TaskManager {
     parseSubmissionMessage(content) {
         try {
             let json = JSON.parse(content); 
-            if (json.taskId && json.data && json.data.messageType && json.data.body) {
+            if (json.task_id && json.data && json.data.message_type && json.data.body) {
                 return json;
             } else {
                 return null;
@@ -259,7 +259,7 @@ taskManager.start().catch((err) => {
 
 /* exemple de message:
 {
-  "taskId": "089373b8-1691-4462-8f78-25e3af1a1c6b",
-  "data": { "messageType": "submission", "body": { "sleep": 10, "mustSucceed": true} }
+  "task_id": "089373b8-1691-4462-8f78-25e3af1a1c6b",
+  "data": { "message_type": "submission", "body": { "sleep": 10, "mustSucceed": true} }
 }
 */

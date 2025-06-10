@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from kombu import Connection, Producer, Queue
@@ -12,10 +13,7 @@ from app.schema.broker import Broker
 class RabbitMQBroker(Broker):
     def __init__(self) -> None:
         self.services: list[str] = settings.SERVICE_LIST
-        self.queues: dict[str, Queue] = {
-            service: Queue(name=service, routing_key=service)
-            for service in self.services
-        }
+        self.queues: dict[str, Queue] = {service: Queue(name=service, routing_key=service) for service in self.services}
         self.connection: Connection | None = None
         self.producer: Producer | None = None
 
@@ -62,7 +60,7 @@ class RabbitMQBroker(Broker):
         bound_queue: Queue = self.queues[queue](self.producer.channel)
         bound_queue.declare()
         self.producer.publish(
-            body=task.model_dump_json(),
+            body=json.loads(task.model_dump_json()),
             serializer="json",
             routing_key=queue,
         )

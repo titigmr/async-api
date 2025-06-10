@@ -1,10 +1,11 @@
-version: '3.9'
 
 services:
   api:
     build: .
     ports:
       - "8000:8000"
+    volumes:
+    - $PWD/app:/app
     depends_on:
       - db
       - rabbitmq
@@ -12,7 +13,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/tasks
 
   db:
-    image: postgres:14
+    image: postgres:17
     env_file:
       - .env
     environment:
