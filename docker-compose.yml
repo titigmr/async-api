@@ -1,19 +1,35 @@
 
 services:
   api:
+    image: api:latest
+    container_name: api
+    volumes:
+      - ${PWD}/api:/app/api
     build: .
     ports:
-      - "8000:8000"
+    - "8000:8000"
+    depends_on:
+    - db
+    - broker
+    env_file:
+    - .env
+  consumer:
+    image: consumer:latest
+    container_name: consumer
     volumes:
-    - $PWD/app:/app
+      - ${PWD}/workers/js/index.js:/app/index.js
+    build:
+      context: ./workers/js
+      dockerfile: Dockerfile
     depends_on:
       - db
-      - rabbitmq
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/tasks
-
+      - broker
+    env_file:
+      - .env
   db:
     image: postgres:17
+    volumes:
+      - db-data:/var/lib/postgresql/data
     env_file:
       - .env
     environment:
@@ -23,9 +39,12 @@ services:
     ports:
       - "5432:5432"
 
-  rabbitmq:
+  broker:
     image: rabbitmq:management
     container_name: rabbitmq
+    volumes:
+      - broker-lib:/var/lib/rabbitmq
+      - broker-log:/var/log/rabbitmq
     restart: always
     ports:
       - 5672:5672
@@ -34,8 +53,11 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: kalo
       RABBITMQ_DEFAULT_PASS: kalo
+
 volumes:
-  rabbitmq-lib:
+  db-data:
     driver: local
-  rabbitmq-log:
+  broker-lib:
+    driver: local
+  broker-log:
     driver: local

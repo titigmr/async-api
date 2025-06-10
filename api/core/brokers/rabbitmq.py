@@ -4,16 +4,19 @@ from typing import Any
 from kombu import Connection, Producer, Queue
 from kombu.exceptions import KombuError
 
-from app.core.config import settings
-from app.core.utils import logger
-from app.schema import QueueTask
-from app.schema.broker import Broker
+from api.core.brokers.base import Broker
+from api.core.config import settings
+from api.core.utils import logger
+from api.schema import QueueTask
 
 
 class RabbitMQBroker(Broker):
     def __init__(self) -> None:
-        self.services: list[str] = settings.SERVICE_LIST
-        self.queues: dict[str, Queue] = {service: Queue(name=service, routing_key=service) for service in self.services}
+        self.services: list[str] = [s.name for s in settings.SERVICES]
+        self.queues: dict[str, Queue] = {
+            service: Queue(name=service, routing_key=service)
+            for service in self.services
+        }
         self.connection: Connection | None = None
         self.producer: Producer | None = None
 
@@ -50,8 +53,7 @@ class RabbitMQBroker(Broker):
             self.connection.release()
 
     def add_task(self, task: QueueTask, service: str) -> None:
-        if not self.producer:
-            self.setup()
+        self.ensure_connection()
         queue: str = service
         if queue not in self.queues:
             raise ValueError(f"Service {queue} is not registered in the broker.")
@@ -64,3 +66,8 @@ class RabbitMQBroker(Broker):
             serializer="json",
             routing_key=queue,
         )
+
+    def ensure_connection(self) -> None:
+        if not self.connection or not self.connection.connected:
+            logger.warning(msg="RabbitMQ connection lost, reconnecting...")
+            self.setup()

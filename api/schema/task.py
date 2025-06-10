@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from pydantic.networks import AmqpDsn, HttpUrl
 
-from app.schema.enum import TaskStatus
+from api.schema.enum import TaskStatus
 
 
 class TaskData(BaseModel):

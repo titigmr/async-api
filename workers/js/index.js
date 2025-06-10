@@ -9,8 +9,8 @@ const RABBITMQ_USER = process.env.RABBITMQ_USER || 'kalo';
 const RABBITMQ_PASSWORD = process.env.RABBITMQ_PASSWORD || 'kalo';
 const LISTENER_COUNT = Number(process.env.LISTENER_COUNT) || 5;
 
-const IN_QUEUE_NAME = process.env.IN_QUEUE_NAME || 'ocr';
-const OUT_QUEUE_NAME = process.env.OUT_QUEUE_NAME ||'toto';
+const IN_QUEUE_NAME = process.env.IN_QUEUE_NAME || 'example';
+const OUT_QUEUE_NAME = process.env.OUT_QUEUE_NAME ||'example_out';
 
 //------------------------
 // FRAMEWORK

@@ -6,18 +6,22 @@ from fastapi import APIRouter, Body, Depends, Path, status
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
-from app.core.config import settings
-from app.core.database import get_db_session
-from app.schema import (
+from api.core.database import get_db_session
+from api.schema import (
     TaskCallback,
     TaskData,
     TaskErrorResponse,
     TaskRequest,
     TaskResponse,
 )
-from app.schema.enum import ErrorEnum, TaskStatus
-from app.schema.errors import InternalServerError, ServiceNotFound, TaskNotFound
-from app.service import check_service_exists, poll_task, submit_task
+from api.schema.enum import ErrorEnum, TaskStatus
+from api.schema.errors import InternalServerError, ServiceNotFound, TaskNotFound
+from api.service import (
+    check_service_exists,
+    list_services_names,
+    poll_task,
+    submit_task,
+)
 
 router = APIRouter(tags=["Tasks"])
 callback_router = APIRouter()
@@ -63,7 +67,7 @@ async def create_task(
         Path(
             default=...,
             description="Nom du service pour lequel créer la tâche. Doit être dans la liste des services autorisés.",
-            enum=settings.SERVICE_LIST,
+            enum=list_services_names(),
         ),
     ],
     task: Annotated[

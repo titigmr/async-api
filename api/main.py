@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 
-from app.api.v1.routes import health, services, tasks
-from app.core.config import settings
-from app.core.utils import get_version
+from api.api.v1.routes import health, services, tasks
+from api.core.config import settings
+from api.core.utils import get_version
 
 __version__, __name__ = get_version()
 

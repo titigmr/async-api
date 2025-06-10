@@ -3,11 +3,11 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.crud.task import create_task_record, get_task_by_id
-from app.models import Task
-from app.schema import QueueData, QueueTask, TaskData, TaskRequest
-from app.schema.enum import TaskStatus
-from app.service import send_task_to_queue
+from api.crud.task import create_task_record, get_task_by_id
+from api.models import Task
+from api.schema import QueueData, QueueTask, TaskData, TaskRequest
+from api.schema.enum import TaskStatus
+from api.service import send_task_to_queue
 
 
 def poll_task(db: Session, task_id: str, service: str) -> TaskData | None:

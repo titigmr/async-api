@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.models import Task
+from api.models import Task
 
 
 def create_task_record(db: Session, task_data: dict) -> Task:
