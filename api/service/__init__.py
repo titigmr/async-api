@@ -3,6 +3,7 @@ from .service_service import (
     check_service_exists,
     list_services_config,
     list_services_names,
+    validate_body_with_schema,
 )
 from .task_service import poll_task, submit_task
 
@@ -14,4 +15,5 @@ __all__ = [
     "list_services_names",
     "list_services_config",
     "check_service_exists",
+    "validate_body_with_schema",
 ]

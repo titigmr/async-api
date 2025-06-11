@@ -5,6 +5,7 @@ services:
     container_name: api
     volumes:
       - ${PWD}/api:/app/api
+      - ${PWD}/json_schemas:/json_schemas
     build: .
     ports:
     - "8000:8000"

@@ -20,8 +20,8 @@ class TaskAPIException(Exception):
     number: int = 500000
     description: str = "Erreur interne"
 
-    def __init__(self, details: str | None = None):
-        self.details = details
+    def __init__(self, details: str | None = None) -> None:
+        self.details: str | None = details
 
     def to_response(self) -> JSONResponse:
         error = ErrorDetail(
@@ -76,3 +76,9 @@ class NotImplemented(TaskAPIException):
     status_code = 501
     number = 501001
     description = "Not implemented."
+
+
+class BodyValidationError(TaskAPIException):
+    status_code = 400
+    number = 400001
+    description = "Le body ne correspond pas au json_schema du service."

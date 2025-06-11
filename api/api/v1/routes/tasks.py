@@ -15,7 +15,12 @@ from api.schema import (
     TaskResponse,
 )
 from api.schema.enum import ErrorEnum, TaskStatus
-from api.schema.errors import InternalServerError, ServiceNotFound, TaskNotFound
+from api.schema.errors import (
+    InternalServerError,
+    ServiceNotFound,
+    TaskAPIException,
+    TaskNotFound,
+)
 from api.service import (
     check_service_exists,
     list_services_names,
@@ -89,7 +94,7 @@ async def create_task(
             return error.to_response()
         task_data: TaskData = submit_task(db=db, task=task, service=service)
         return TaskResponse(status=TaskStatus.SUCCESS, data=task_data)
-    except ServiceNotFound as error:
+    except (ServiceNotFound, TaskAPIException) as error:
         return error.to_response()
     except Exception as error:
         logger.exception(msg=f"Erreur lors de la création de la tâche : {error}")

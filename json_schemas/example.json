@@ -4,13 +4,13 @@
   "properties": {
     "sleep": {
       "type": "integer",
-      "description": "Durée de sommeil en secondes"
+      "description": "Durée d'attente en secondes"
     },
     "mustSucceed": {
       "type": "boolean",
       "description": "Indique si la tâche doit réussir"
     }
   },
-  "required": ["sleep", "mustSucceed"],
+  "required": ["sleep"],
   "additionalProperties": false
 }
