@@ -16,4 +16,5 @@ dependencies = [
     "toml>=0.10.2",
     "uvicorn>=0.34.3",
     "jsonschema>=4.22.0",
+    "asyncpg>=0.30.0",
 ]

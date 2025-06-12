@@ -1,6 +1,6 @@
 from api.core.config import settings
-from api.schema.errors import ServiceNotFound
-from api.schema.service import ServiceInfo
+from api.schemas import ServiceInfo
+from api.schemas.errors import ServiceNotFound
 
 
 def check_service_exists(service: str) -> None:

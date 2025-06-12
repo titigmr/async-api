@@ -1,6 +1,6 @@
 from api.core.brokers import Broker, RabbitMQBroker
 from api.core.config import settings
-from api.schema.queue import QueueTask
+from api.schemas import QueueTask
 
 _broker_instance = None
 

@@ -16,7 +16,9 @@ class Task(SQLModel, table=True):
     error_message: Optional[str] = Field(default=None)
     progress: float = Field(default=0.0, nullable=False)
     response: Optional[str] = Field(default=None)
-    callback: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON, nullable=True))
+    callback: Optional[Dict[str, Any]] = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
     submition_date: datetime = Field(default_factory=datetime.now, nullable=False)
     start_date: Optional[datetime] = Field(default=None)
     end_date: Optional[datetime] = Field(default=None)

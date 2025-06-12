@@ -2,13 +2,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.brokers import Broker
 from api.core.database import get_db_session
 from api.core.utils import logger
-from api.schema.health import HealthComponent, HealthResponse
-from api.service import get_broker
+from api.schemas.health import HealthComponent, HealthResponse
+from api.services import get_broker
 
 router = APIRouter()
 
@@ -18,13 +18,13 @@ router = APIRouter()
     response_model=HealthResponse,
     summary="Vérifie la santé de l'API, DB et Broker",
 )
-def health_check(
-    db: Annotated[Session, Depends(dependency=get_db_session)],
+async def health_check(
+    db: Annotated[AsyncSession, Depends(dependency=get_db_session)],
 ) -> HealthResponse:
     components: dict = {}
 
     try:
-        db.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
         db_status = "ok"
         db_details = None
     except Exception as error:

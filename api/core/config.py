@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from api.schema.service import ServiceInfo
+from api.schemas.service import ServiceInfo
 
 
 def load_json_schema(path: str) -> dict:

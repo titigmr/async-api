@@ -3,25 +3,25 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 
 from api.core.database import get_db_session
-from api.schema import (
+from api.schemas import (
     TaskCallback,
     TaskData,
     TaskErrorResponse,
     TaskRequest,
     TaskResponse,
 )
-from api.schema.enum import ErrorEnum, TaskStatus
-from api.schema.errors import (
+from api.schemas.enum import ErrorEnum, TaskStatus
+from api.schemas.errors import (
     InternalServerError,
     ServiceNotFound,
     TaskAPIException,
     TaskNotFound,
 )
-from api.service import (
+from api.services import (
     check_service_exists,
     list_services_names,
     poll_task,
@@ -82,7 +82,7 @@ async def create_task(
             description="Représente la tâche à créer. Inclut le nom du service, les paramètres, et éventuellement un callback.",
         ),
     ],
-    db: Annotated[Session, Depends(dependency=get_db_session)],
+    db: Annotated[AsyncSession, Depends(dependency=get_db_session)],
 ) -> JSONResponse | TaskResponse:
     """
     Crée une tâche pour le service demandé.
@@ -92,7 +92,7 @@ async def create_task(
             check_service_exists(service=service)
         except ServiceNotFound as error:
             return error.to_response()
-        task_data: TaskData = submit_task(db=db, task=task, service=service)
+        task_data: TaskData = await submit_task(db=db, task=task, service=service)
         return TaskResponse(status=TaskStatus.SUCCESS, data=task_data)
     except (ServiceNotFound, TaskAPIException) as error:
         return error.to_response()
@@ -133,14 +133,16 @@ async def get_task(
         str,
         Path(default=..., description="Identifiant unique de la tâche à récupérer."),
     ],
-    db: Annotated[Session, Depends(dependency=get_db_session)],
+    db: Annotated[AsyncSession, Depends(dependency=get_db_session)],
 ) -> TaskResponse | JSONResponse:
     """
     Récupère le statut d'une tâche via son identifiant.
     - **task_id** : identifiant unique de la tâche
     """
     try:
-        task_info: TaskData | None = poll_task(db=db, task_id=task_id, service=service)
+        task_info: TaskData | None = await poll_task(
+            db=db, task_id=task_id, service=service
+        )
         if not task_info:
             return TaskNotFound(
                 details=f"Tâche '{task_id}' introuvable pour le service '{service}'."

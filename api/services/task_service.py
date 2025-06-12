@@ -1,16 +1,14 @@
-import json
 import uuid
 
 from jsonschema import validate
-from sqlalchemy.orm import Session
 
+from api.core.database import AsyncSession
 from api.crud.task import create_task_record, get_task_by_id
 from api.models import Task
-from api.schema import QueueData, QueueTask, TaskData, TaskRequest
-from api.schema.enum import TaskStatus
-from api.schema.errors import BodyValidationError
-from api.schema.service import ServiceInfo
-from api.service import list_services_config, send_task_to_queue
+from api.schemas import QueueData, QueueTask, ServiceInfo, TaskData, TaskRequest
+from api.schemas.enum import TaskStatus
+from api.schemas.errors import BodyValidationError
+from api.services import list_services_config, send_task_to_queue
 
 
 def check_service_schema(service: str, body: dict) -> None:
@@ -30,9 +28,11 @@ def check_service_schema(service: str, body: dict) -> None:
             )
 
 
-def poll_task(db: Session, task_id: str, service: str) -> TaskData | None:
+async def poll_task(db: AsyncSession, task_id: str, service: str) -> TaskData | None:
     """Poll a task by its ID"""
-    task_info: Task | None = get_task_by_id(db=db, task_id=task_id, service=service)
+    task_info: Task | None = await get_task_by_id(
+        db=db, task_id=task_id, service=service
+    )
     if task_info:
         return TaskData(
             task_id=task_info.task_id,
@@ -41,7 +41,7 @@ def poll_task(db: Session, task_id: str, service: str) -> TaskData | None:
         )
 
 
-def submit_task(db: Session, task: TaskRequest, service: str) -> TaskData:
+async def submit_task(db: AsyncSession, task: TaskRequest, service: str) -> TaskData:
     """Submit a new task"""
     check_service_schema(service=service, body=task.body)
     task_id = str(uuid.uuid4())
@@ -58,5 +58,5 @@ def submit_task(db: Session, task: TaskRequest, service: str) -> TaskData:
         request=task.body,
         callback=task.callback.model_dump() if task.callback else None,
     )
-    create_task_record(db=db, task_data=json.loads(s=task_obj.model_dump_json()))
+    await create_task_record(db=db, task_data=task_obj.model_dump())
     return TaskData(task_id=task_id, task_position=None, status=TaskStatus.PENDING)

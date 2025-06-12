@@ -7,7 +7,7 @@ from kombu.exceptions import KombuError
 from api.core.brokers.base import Broker
 from api.core.config import settings
 from api.core.utils import logger
-from api.schema import QueueTask
+from api.schemas import QueueTask
 
 
 class RabbitMQBroker(Broker):
@@ -62,7 +62,7 @@ class RabbitMQBroker(Broker):
         bound_queue: Queue = self.queues[queue](self.producer.channel)
         bound_queue.declare()
         self.producer.publish(
-            body=json.loads(task.model_dump_json()),
+            body=json.loads(s=task.model_dump_json()),
             serializer="json",
             routing_key=queue,
         )
