@@ -3,10 +3,8 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 
-from api.core.database import get_db_session
 from api.schemas import (
     TaskCallback,
     TaskData,
@@ -21,16 +19,10 @@ from api.schemas.errors import (
     TaskAPIException,
     TaskNotFound,
 )
-from api.services import (
-    check_service_exists,
-    list_services_names,
-    poll_task,
-    submit_task,
-)
+from api.services import ServiceService, TaskService
 
 router = APIRouter(tags=["Tasks"])
 callback_router = APIRouter()
-
 logger: logging.Logger = logging.getLogger(name="uvicorn.error")
 
 
@@ -72,7 +64,7 @@ async def create_task(
         Path(
             default=...,
             description="Nom du service pour lequel créer la tâche. Doit être dans la liste des services autorisés.",
-            enum=list_services_names(),
+            enum=ServiceService.list_services_names(),
         ),
     ],
     task: Annotated[
@@ -82,22 +74,23 @@ async def create_task(
             description="Représente la tâche à créer. Inclut le nom du service, les paramètres, et éventuellement un callback.",
         ),
     ],
-    db: Annotated[AsyncSession, Depends(dependency=get_db_session)],
+    service_service: Annotated[ServiceService, Depends(ServiceService)],
+    task_service: Annotated[TaskService, Depends(TaskService)],
 ) -> JSONResponse | TaskResponse:
     """
     Crée une tâche pour le service demandé.
     """
     try:
         try:
-            check_service_exists(service=service)
+            service_service.check_service_exists(service=service)
         except ServiceNotFound as error:
             return error.to_response()
-        task_data: TaskData = await submit_task(db=db, task=task, service=service)
+        task_data: TaskData = await task_service.submit_task(task=task, service=service)
         return TaskResponse(status=TaskStatus.SUCCESS, data=task_data)
-    except (ServiceNotFound, TaskAPIException) as error:
+    except TaskAPIException as error:
         return error.to_response()
     except Exception as error:
-        logger.exception(msg=f"Erreur lors de la création de la tâche : {error}")
+        logger.error(msg=f"Internal server error: {error}")
         return InternalServerError(details=str(error)).to_response()
 
 
@@ -127,27 +120,25 @@ async def get_task(
         Path(
             default=...,
             description="Nom du service pour lequel récupérer la tâche. Doit être dans la liste des services autorisés.",
+            enum=ServiceService.list_services_names(),
         ),
     ],
     task_id: Annotated[
         str,
         Path(default=..., description="Identifiant unique de la tâche à récupérer."),
     ],
-    db: Annotated[AsyncSession, Depends(dependency=get_db_session)],
+    task_service: Annotated[TaskService, Depends(TaskService)],
 ) -> TaskResponse | JSONResponse:
     """
     Récupère le statut d'une tâche via son identifiant.
     - **task_id** : identifiant unique de la tâche
     """
     try:
-        task_info: TaskData | None = await poll_task(
-            db=db, task_id=task_id, service=service
+        task_info: TaskData | None = await task_service.poll_task(
+            task_id=task_id, service=service
         )
         if not task_info:
-            return TaskNotFound(
-                details=f"Tâche '{task_id}' introuvable pour le service '{service}'."
-            ).to_response()
+            return TaskNotFound().to_response()
         return TaskResponse(status=TaskStatus.PENDING, data=task_info)
     except Exception as error:
-        logger.exception(msg=f"Erreur lors de la récupération de la tâche : {error}")
         return InternalServerError(details=str(error)).to_response()

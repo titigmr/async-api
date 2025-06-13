@@ -1,11 +1,11 @@
-from api.core.brokers import Broker, RabbitMQBroker
+from api.core.brokers import AbstractBroker, RabbitMQBroker
 from api.core.config import settings
 from api.schemas import QueueTask
 
 _broker_instance = None
 
 
-def get_broker() -> Broker:
+def get_broker() -> AbstractBroker:
     """Retourne une instance unique du broker choisi selon la config."""
     global _broker_instance
     if _broker_instance is not None:
@@ -21,5 +21,5 @@ def get_broker() -> Broker:
 
 
 def send_task_to_queue(task_data: QueueTask, service: str) -> None:
-    broker: Broker = get_broker()
+    broker: AbstractBroker = get_broker()
     broker.add_task(task=task_data, service=service)

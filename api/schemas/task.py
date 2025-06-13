@@ -1,10 +1,27 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Dict, Literal
 
 from pydantic import BaseModel, Field
-from pydantic.networks import AmqpDsn, HttpUrl
 
 from api.schemas.enum import TaskStatus
+
+
+class Callback(BaseModel):
+    url: str | None = Field(
+        default=None, description="URL ou AMQP DSN à appeler en callback"
+    )
+    type: Literal["http", "amqp"] | None = Field(
+        default=None, description="Type de callback (http ou amqp)"
+    )
+
+
+class TaskInfo(BaseModel):
+    task_id: str
+    client_id: str
+    service: str
+    status: TaskStatus
+    request: Dict[str, Any]
+    callback: Callback | None = None
 
 
 class TaskData(BaseModel):
@@ -18,15 +35,6 @@ class TaskData(BaseModel):
     )
     submission_date: datetime | None = Field(
         default=None, description="Date de soumission de la tâche"
-    )
-
-
-class Callback(BaseModel):
-    url: AmqpDsn | HttpUrl | None = Field(
-        default=None, description="URL ou AMQP DSN à appeler en callback"
-    )
-    type: Literal["http", "amqp"] | None = Field(
-        default=None, description="Type de callback (http ou amqp)"
     )
 
 

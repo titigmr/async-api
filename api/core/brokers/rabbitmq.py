@@ -4,13 +4,13 @@ from typing import Any
 from kombu import Connection, Producer, Queue
 from kombu.exceptions import KombuError
 
-from api.core.brokers.base import Broker
+from api.core.brokers import AbstractBroker
 from api.core.config import settings
 from api.core.utils import logger
 from api.schemas import QueueTask
 
 
-class RabbitMQBroker(Broker):
+class RabbitMQBroker(AbstractBroker):
     def __init__(self) -> None:
         self.services: list[str] = [s.name for s in settings.SERVICES]
         self.queues: dict[str, Queue] = {

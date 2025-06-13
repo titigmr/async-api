@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.ext.declarative import declarative_base
 
 from api.core.config import settings
 
@@ -14,7 +15,8 @@ AsyncSessionLocal = async_sessionmaker(
     bind=engine, autoflush=False, class_=AsyncSession
 )
 
-# SQLModel.metadata.create_all(bind=engine)
+Base: Any = declarative_base()
+# Base.metadata.create_all(bind=engine)
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 
-class Broker(ABC):
+class AbstractBroker(ABC):
     @abstractmethod
     def setup(self) -> None:
         """Initialize the broker connection and any necessary setup."""

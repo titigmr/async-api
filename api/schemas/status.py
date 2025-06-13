@@ -1,11 +1,15 @@
 from pydantic import BaseModel
 
 
-class HealthComponent(BaseModel):
+class ReadyComponent(BaseModel):
     status: str
     details: str | None = None
 
 
 class HealthResponse(BaseModel):
     status: str
-    components: dict[str, HealthComponent]
+
+
+class ReadyResponse(BaseModel):
+    status: str
+    components: dict[str, ReadyComponent]

@@ -1,8 +1,15 @@
 from .callback import TaskCallback
-from .health import HealthComponent, HealthResponse
 from .queue import QueueData, QueueTask
 from .service import ServiceInfo
-from .task import TaskData, TaskErrorResponse, TaskRequest, TaskResponse
+from .status import HealthResponse, ReadyComponent, ReadyResponse
+from .task import (
+    Callback,
+    TaskData,
+    TaskErrorResponse,
+    TaskInfo,
+    TaskRequest,
+    TaskResponse,
+)
 
 __all__ = [
     "QueueTask",
@@ -12,7 +19,11 @@ __all__ = [
     "TaskData",
     "TaskCallback",
     "QueueData",
-    "HealthComponent",
-    "HealthResponse",
     "ServiceInfo",
+    "TaskInfo",
+    "HealthResponse",
+    "ReadyComponent",
+    "ReadyResponse",
+    "Callback",
+    "TaskInfo",
 ]

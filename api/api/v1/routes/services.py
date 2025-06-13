@@ -1,9 +1,9 @@
-from typing import List
+from typing import Annotated, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from api.schemas import ServiceInfo
-from api.services import list_services_config
+from api.services import ServiceService
 
 router = APIRouter()
 
@@ -14,8 +14,10 @@ router = APIRouter()
     description="Retourne la liste des services disponibles pour la création de tâches.",
     response_model=List[ServiceInfo],
 )
-def get_services() -> list[ServiceInfo]:
+def get_services(
+    service_service: Annotated[ServiceService, Depends(ServiceService)],
+) -> list[ServiceInfo]:
     """
     Retourne la liste des services disponibles avec leur json_schema.
     """
-    return list_services_config()
+    return service_service.list_services_config()

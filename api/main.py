@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from api.api.v1.routes import health, services, tasks, metrics
+from api.api.v1.routes import metrics, services, status, tasks
 from api.core.config import settings
 from api.core.utils import get_version
 
@@ -15,5 +15,5 @@ app = FastAPI(
 
 app.include_router(router=services.router, prefix="/v1", tags=["Services"])
 app.include_router(router=tasks.router, prefix="/v1", tags=["Tasks"])
-app.include_router(router=health.router, tags=["Health"])
 app.include_router(router=metrics.router, tags=["Metrics"])
+app.include_router(router=status.router, tags=["Status"])

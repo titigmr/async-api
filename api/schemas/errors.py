@@ -1,6 +1,8 @@
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from api.core.utils import logger
+
 
 class ErrorDetail(BaseModel):
     number: int = Field(default=..., description="Code d'erreur unique")
@@ -18,10 +20,14 @@ class TaskErrorResponse(BaseModel):
 class TaskAPIException(Exception):
     status_code: int = 500
     number: int = 500000
-    description: str = "Erreur interne"
+    description: str = "Internal server error"
 
     def __init__(self, details: str | None = None) -> None:
         self.details: str | None = details
+        logger.error(
+            msg=f"Internal server error: {self.number} - {self.description}",
+            extra={"details": self.details},
+        )
 
     def to_response(self) -> JSONResponse:
         error = ErrorDetail(
@@ -39,46 +45,46 @@ class TaskAPIException(Exception):
 class ServiceNotFound(TaskAPIException):
     status_code = 404
     number = 404001
-    description = "Service not found."
+    description = "Service not found"
 
 
 class TaskNotFound(TaskAPIException):
     status_code = 404
     number = 404002
-    description = "Task not found."
+    description = "Task not found"
 
 
 class Forbidden(TaskAPIException):
     status_code = 403
     number = 403001
-    description = "Forbidden."
+    description = "Forbidden"
 
 
 class TooManyRequests(TaskAPIException):
     status_code = 429
     number = 429001
-    description = "Too many service requests."
+    description = "Too many service requests"
 
 
 class Unauthorized(TaskAPIException):
     status_code = 401
     number = 401001
-    description = "Authentication required."
+    description = "Authentication required"
 
 
 class InternalServerError(TaskAPIException):
     status_code = 500
     number = 500000
-    description = "Internal server error."
+    description = "Internal server error"
 
 
 class NotImplemented(TaskAPIException):
     status_code = 501
     number = 501001
-    description = "Not implemented."
+    description = "Not implemented"
 
 
 class BodyValidationError(TaskAPIException):
     status_code = 400
     number = 400001
-    description = "Le body ne correspond pas au json_schema du service."
+    description = "Body validation error"
