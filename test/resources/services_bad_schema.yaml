@@ -1,0 +1,11 @@
+- name: example
+  quotas: 1000
+  json_schema: ./test/resources/bad_schema.json
+  in_queue: example_in_queue
+  out_queue: example_out_queue
+
+- name: example2
+  # json_schema: ./schemas/example.json # Default: No schema
+  # quotas: 1000                        # Default: No quotas
+  # in_queue: example_queue_in          # Default: <svc>_in_queue
+  # out_queue: example_queue_out        # Default: <svc>_out_queue

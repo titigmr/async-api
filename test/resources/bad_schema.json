@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "sleep": {
+      "type": "integer",
+      "description": "Durée d'attente en secondes"
+    },
+    "mustSucceed": {
+      "type": "boolean",
+      "description": "Indique si la tâche doit réussir"
+    }
+  },
+  "required": ["sleep"],
+  "additionalProperties": false

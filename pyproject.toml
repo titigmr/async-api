@@ -19,4 +19,5 @@ dependencies = [
     "asyncpg>=0.30.0",
     "prometheus-client>=0.18.0",
     "prometheus-fastapi-instrumentator>=7.1.0",
+    "pyyaml>=6.0.2",
 ]

@@ -6,6 +6,7 @@ services:
     volumes:
       - ${PWD}/api:/app/api
       - ${PWD}/json_schemas:/json_schemas
+      - ${PWD}/config:/app/config
     build: .
     ports:
     - "8000:8000"
