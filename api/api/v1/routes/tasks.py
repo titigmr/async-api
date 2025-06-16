@@ -64,7 +64,6 @@ async def create_task(
         Path(
             default=...,
             description="Nom du service pour lequel créer la tâche. Doit être dans la liste des services autorisés.",
-            enum=ServiceService.list_services_names(),
         ),
     ],
     task: Annotated[
@@ -120,7 +119,6 @@ async def get_task(
         Path(
             default=...,
             description="Nom du service pour lequel récupérer la tâche. Doit être dans la liste des services autorisés.",
-            enum=ServiceService.list_services_names(),
         ),
     ],
     task_id: Annotated[

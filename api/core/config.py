@@ -13,13 +13,7 @@ def load_json_schema(path: str) -> dict:
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", yaml_file=".env.yaml")
-    # SERVICES: list[ServiceInfo] = [
-    #     ServiceInfo(
-    #         name="example",
-    #         json_schema=load_json_schema(path="/json_schemas/example.json"),
-    #     )
-    # ]
+    model_config = SettingsConfigDict(extra="allow",env_file=".env", yaml_file=".env.yaml")
     PROJECT_NAME: str = "Task API"
     DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/tasks"
     BROKER_URL: str = "amqp://guest:guest@rabbitmq//"

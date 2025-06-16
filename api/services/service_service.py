@@ -1,34 +1,37 @@
+from typing import Annotated
+
+from fastapi import Depends
 from api.core.config import settings
+from api.repositories.services_config_repository import ServicesConfigRepository
 from api.schemas import ServiceInfo
 from api.schemas.errors import ServiceNotFound
 
 
 class ServiceService:
-    def __init__(self) -> None:
-        pass
+    def __init__(self, service_repository: Annotated[ServicesConfigRepository, Depends(ServicesConfigRepository)]) -> None:
+        self.service_repository: ServicesConfigRepository = service_repository
 
-    @staticmethod
-    def check_service_exists(service: str) -> None:
+    def check_service_exists(self,service: str) -> None:
         """
         Vérifie que le service existe dans la liste autorisée.
         Lève ServiceNotFound si ce n'est pas le cas.
         """
-        if service not in [s.name for s in settings.SERVICES]:
+        if self.service_repository.all_services().get(service) is None:
             raise ServiceNotFound(details=f"Service '{service}' inconnu.")
 
-    @staticmethod
-    def list_services_names() -> list[str]:
+    def list_services_names(self) -> list[str]:
         """
         Retourne la liste des noms des services disponibles.
         """
-        return [s.name for s in settings.SERVICES]
+        return list(self.service_repository.all_services().keys())
 
-    @staticmethod
-    def list_services_config() -> list[ServiceInfo]:
+    def list_all(self) -> list[ServiceInfo]:
         """
-        Retourne la configuration complète (nom + json_schema) de chaque service.
+        Retourne la liste des noms des services disponibles.
         """
-        return [
-            ServiceInfo(name=s.name, json_schema=s.json_schema)
-            for s in settings.SERVICES
-        ]
+        services = list(self.service_repository.all_services().values())
+        print(f"Services loaded: {services}")
+        return list(map(lambda c: ServiceInfo(
+            name=c.name, quotas=c.quotas, json_schema=c.json_schema, in_queue=c.in_queue, out_queue=c.out_queue
+            ), services))
+

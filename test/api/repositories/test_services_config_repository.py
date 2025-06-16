@@ -10,7 +10,7 @@ class TestServicesConfigRepository(unittest.TestCase):
     def test_initialization_bad_yaml_file(self):
         self.assertRaises(ServicesConfigException, ServicesConfigRepository.load_services_config, svc_file="./test/resources/bad_yaml.yaml")
 
-    def test_parse_yaml_struct(self):
+    def test_all_services(self):
         # Sigleton registration (read config at startup)
         ServicesConfigRepository.load_services_config("./test/resources/services.yaml")
         print(f"{ServicesConfigRepository.SERVICES}")

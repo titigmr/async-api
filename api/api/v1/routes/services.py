@@ -20,4 +20,4 @@ def get_services(
     """
     Retourne la liste des services disponibles avec leur json_schema.
     """
-    return service_service.list_services_config()
+    return service_service.list_all()
