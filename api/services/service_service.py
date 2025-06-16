@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from fastapi import Depends
-from api.core.config import settings
 from api.repositories.services_config_repository import ServicesConfigRepository
 from api.schemas import ServiceInfo
 from api.schemas.errors import ServiceNotFound
@@ -35,3 +34,9 @@ class ServiceService:
             name=c.name, quotas=c.quotas, json_schema=c.json_schema, in_queue=c.in_queue, out_queue=c.out_queue
             ), services))
 
+    def get_service(self, service: str) -> ServiceInfo | None:
+        """
+        Retourne les informations d'un service spécifique.
+        Lève ServiceNotFound si le service n'existe pas.
+        """
+        return self.service_repository.all_services()[service]

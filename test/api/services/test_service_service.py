@@ -9,7 +9,6 @@ class TestServiceServices(unittest.TestCase):
         self.services_config_repo_mock: ServicesConfigRepository = Mock()
         self.service_service = ServiceService(self.services_config_repo_mock)
 
-
         self.services_config_repo_mock.all_services.return_value = {
             "example": ServicesConfig(name="example", quotas=1000, json_schema={"$schema": "http://json-schema.org/draft-07/schema#"}, in_queue="example_in_queue", out_queue="example_out_queue"),
             "example2": ServicesConfig(name="example2", quotas=None, json_schema=None, in_queue="the_in_queue", out_queue="the_out_queue"),

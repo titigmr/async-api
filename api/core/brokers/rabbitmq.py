@@ -8,11 +8,12 @@ from api.core.brokers import AbstractBroker
 from api.core.config import settings
 from api.core.utils import logger
 from api.schemas import QueueTask
+from api.services.service_service import ServiceService
 
 
 class RabbitMQBroker(AbstractBroker):
-    def __init__(self) -> None:
-        self.services: list[str] = [s.name for s in settings.SERVICES]
+    def __init__(self, service: ServiceService) -> None:
+        self.services: list[str] = [s.name for s in service.list_services_names()]
         self.queues: dict[str, Queue] = {
             service: Queue(name=service, routing_key=service)
             for service in self.services
