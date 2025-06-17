@@ -1,9 +1,10 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Depends
 from api.repositories.services_config_repository import ServicesConfigRepository
 from api.schemas import ServiceInfo
 from api.schemas.errors import ServiceNotFound
+from api.schemas.service import service_info_from_service_config
 
 
 class ServiceService:
@@ -29,14 +30,18 @@ class ServiceService:
         Retourne la liste des noms des services disponibles.
         """
         services = list(self.service_repository.all_services().values())
-        print(f"Services loaded: {services}")
-        return list(map(lambda c: ServiceInfo(
-            name=c.name, quotas=c.quotas, json_schema=c.json_schema, in_queue=c.in_queue, out_queue=c.out_queue
-            ), services))
+        return list(map(service_info_from_service_config, services))
 
-    def get_service(self, service: str) -> ServiceInfo | None:
+    def get_service(self, service_name: str) -> ServiceInfo | None:
         """
         Retourne les informations d'un service spécifique.
         Lève ServiceNotFound si le service n'existe pas.
         """
-        return self.service_repository.all_services()[service]
+        service = self.service_repository.all_services().get(service_name)
+
+        if service is None:
+            return None
+        else:
+            return service_info_from_service_config(service)
+    
+

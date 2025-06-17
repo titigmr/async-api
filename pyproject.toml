@@ -21,3 +21,9 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=7.1.0",
     "pyyaml>=6.0.2",
 ]
+
+[dependency-groups]
+dev = [
+    "coverage>=7.9.1",
+    "pytest>=8.4.0",
+]

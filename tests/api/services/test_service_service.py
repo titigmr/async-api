@@ -1,3 +1,4 @@
+from typing import TypeVar
 import unittest
 from unittest.mock import Mock
 
@@ -35,10 +36,11 @@ class TestServiceServices(unittest.TestCase):
         example = next((i for i in services if i.name == "example"), None)
         example2 = next((i for i in services if i.name == "example2"), None)
 
-        self.assertIsNotNone(example)
-        self.assertIsNotNone(example2)
+        assert example is not None
+        assert example2 is not None
 
-        self.assertEqual(example.name, "example")
-        self.assertEqual(example2.name, "example2")
-        self.assertIsNotNone(example.json_schema)
-        self.assertIsNone(example2.json_schema)
+        assert example.name == "example"
+        assert example2.name == "example2"
+        assert example.json_schema is not None 
+        assert example2.json_schema is None 
+

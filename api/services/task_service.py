@@ -38,14 +38,8 @@ class TaskService:
         Vérifie que le body est conforme au json_schema du service (si défini).
         Lève BodyValidationError si la validation échoue.
         """
-        service_obj: ServiceInfo | None = next(
-            (
-                s
-                for s in self.service_service.list_services_config()
-                if s.name == service
-            ),
-            None,
-        )
+        service_obj: ServiceInfo | None = self.service_service.get_service(service)
+
         if service_obj and service_obj.json_schema:
             try:
                 validate(instance=body, schema=service_obj.json_schema)

@@ -1,5 +1,6 @@
 
 
+import os
 from api.core.utils import logger
 import yaml
 
@@ -34,8 +35,9 @@ class ClientsConfigException(Exception):
 class ClientConfigRepository:
     
     # Singleton instance to hold the services configuration
-    CLIENTS: dict = None
+    CLIENTS: dict[str, ClientConfig] = {}
 
+    @staticmethod
     def load_clients_config(client_file: str):
         try:
             with open(client_file) as file:
@@ -48,6 +50,7 @@ class ClientConfigRepository:
             logger.error(f"Error parsing YAML file {client_file}: {e}")
             raise ClientsConfigException(f"Error parsing YAML file {client_file}.")
 
+    @staticmethod
     def _parse_yaml_struct(config) -> dict[str, ClientConfig]:
         """
         Parses the YAML structure and returns a dictionary with service names as keys
@@ -67,6 +70,7 @@ class ClientConfigRepository:
                 raise ClientsConfigException("Each client configuration must contain a 'client_id' key.")
             client_id = config_item['client_id']
             client_secret = config_item.get('client_secret', None)
+            client_secret = ClientConfigRepository._resolve_secret(client_secret)
 
             authorisations_part = config_item.get('authorizations', [])
             authorisations: dict[str,ClientAuthorization] = {}
@@ -90,6 +94,23 @@ class ClientConfigRepository:
             )
             clients[client_name] = client_config
         return clients
+
+    @staticmethod
+    def _resolve_secret(secret: str | None) -> str | None:
+        """
+        Resolves the client secret, which can be a string or None.
+        If the secret is None, it returns None.
+        """
+        if secret is None:
+            return None
+        if not secret.startswith("$"):
+            return secret
+        
+        env_secret = os.environ.get(secret[1:])
+        if env_secret is None:
+            raise ClientsConfigException(f"Env variable : '{secret}' not found.")
+        
+        return env_secret
 
     def all_clients(self) -> dict[str, ClientConfig]:
         """

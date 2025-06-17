@@ -13,7 +13,7 @@ from api.services.service_service import ServiceService
 
 class RabbitMQBroker(AbstractBroker):
     def __init__(self, service: ServiceService) -> None:
-        self.services: list[str] = [s.name for s in service.list_services_names()]
+        self.services: list[str] = [s for s in service.list_services_names()]
         self.queues: dict[str, Queue] = {
             service: Queue(name=service, routing_key=service)
             for service in self.services

@@ -1,5 +1,6 @@
 
 import json
+from typing import Any
 
 from fastapi import Depends
 
@@ -10,7 +11,7 @@ class ServicesConfig:
     def __init__(self, 
                  name: str, 
                  quotas: int | None = None, 
-                 json_schema: dict[str,any] | None = None, 
+                 json_schema: dict[str,Any] | None = None, 
                  in_queue: str | None = None, 
                  out_queue: str | None = None):
         self.name = name
@@ -29,8 +30,9 @@ class ServicesConfigException(Exception):
 class ServicesConfigRepository:
 
     # Singleton instance to hold the services configuration
-    SERVICES: dict = None
+    SERVICES: dict = dict[str, ServicesConfig]()
 
+    @staticmethod
     def load_services_config(svc_file: str):
         try:
             with open(svc_file) as file:
@@ -43,6 +45,7 @@ class ServicesConfigRepository:
             logger.error(f"Error parsing YAML file {svc_file}: {e}")
             raise ServicesConfigException(f"Error parsing YAML file {svc_file}.")
 
+    @staticmethod
     def _parse_yaml_struct(config) -> dict[str, ServicesConfig]:
         """
         Parses the YAML structure and returns a dictionary with service names as keys
@@ -73,7 +76,8 @@ class ServicesConfigRepository:
             services[service_name] = service_config
         return services
     
-    def _handle_json_schema(json_schema: str | None) -> str | None:
+    @staticmethod
+    def _handle_json_schema(json_schema: str | None) -> dict[str,Any] | None:
         """
         Handles the JSON schema file path and returns its content.
         """

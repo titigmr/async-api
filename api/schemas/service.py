@@ -1,6 +1,9 @@
-from typing import Any
+import stat
+from typing import Any, Self
 
 from pydantic import BaseModel, Field
+
+from api.repositories.services_config_repository import ServicesConfig
 
 
 class ServiceInfo(BaseModel):
@@ -10,4 +13,16 @@ class ServiceInfo(BaseModel):
     out_queue : str | None = Field(default=None, description="Queue de sortie du service")
     json_schema: dict[str, Any] | None = Field(
         default=None, description="JsonSchema du service (optionnel)"
+    )
+
+def service_info_from_service_config(service_config: ServicesConfig) -> ServiceInfo :
+    """
+    Convertit un objet ServicesConfig en ServiceInfo.
+    """
+    return ServiceInfo(
+        name=service_config.name,
+        quotas=service_config.quotas,
+        json_schema=service_config.json_schema,
+        in_queue=service_config.in_queue,
+        out_queue=service_config.out_queue
     )

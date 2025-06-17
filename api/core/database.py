@@ -1,12 +1,13 @@
 from typing import Any, AsyncGenerator
 
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 from api.core.config import settings
 
@@ -16,8 +17,6 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 Base: Any = declarative_base()
-# Base.metadata.create_all(bind=engine)
-
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
