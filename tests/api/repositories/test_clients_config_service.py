@@ -25,15 +25,14 @@ class TestClientConfigRepository(unittest.TestCase):
         
         assert len(clients) == 2
         assert "client1" in clients
-        assert clients["client1"].client_id == "ZERJGbnkzjhejuyiyaze"
+        assert clients["client1"].client_id == "client1"
         assert len(clients["client1"].authorizations) == 2
         assert clients["client1"].authorizations["example1"].service == "example1"
         assert clients["client1"].authorizations["example1"].quotas == 100
         assert clients["client1"].authorizations["example2"].service == "example2"
         assert clients["client1"].authorizations["example2"].quotas is None
 
-        assert clients["client2"].name == "client2"
-        assert clients["client2"].client_id == "aERJGbnkzjhejuyiyaze"
+        assert clients["client2"].client_id == "client2"
         assert clients["client2"].client_secret is None
         assert len(clients["client2"].authorizations) == 0
 

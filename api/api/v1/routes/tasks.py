@@ -1,10 +1,15 @@
 import http
+from http import client
 import logging
+from mimetypes import init
+from multiprocessing.connection import Client
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Path, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Header, Path, status
+from fastapi.security import APIKeyHeader, HTTPBasic, HTTPBasicCredentials
 from starlette.responses import JSONResponse
 
+from api.core.security import auth_guard
 from api.schemas import (
     TaskCallback,
     TaskData,
@@ -16,15 +21,16 @@ from api.schemas.enum import ErrorEnum, TaskStatus
 from api.schemas.errors import (
     InternalServerError,
     ServiceNotFound,
-    TaskAPIException,
+    AppException,
     TaskNotFound,
+    Unauthorized,
 )
 from api.services import ServiceService, TaskService
+from api.services.client_service import ClientService
 
 router = APIRouter(tags=["Tasks"])
 callback_router = APIRouter()
 logger: logging.Logger = logging.getLogger(name="uvicorn.error")
-
 
 @callback_router.post(path="{$callback.url}")
 def receive_callback(body: TaskCallback) -> None:  # NOQA
@@ -73,25 +79,13 @@ async def create_task(
             description="Représente la tâche à créer. Inclut le nom du service, les paramètres, et éventuellement un callback.",
         ),
     ],
-    service_service: Annotated[ServiceService, Depends(ServiceService)],
     task_service: Annotated[TaskService, Depends(TaskService)],
-) -> JSONResponse | TaskResponse:
+    client_id: Annotated[str, Depends(auth_guard)]):
     """
     Crée une tâche pour le service demandé.
-    """
-    try:
-        try:
-            service_service.check_service_exists(service=service)
-        except ServiceNotFound as error:
-            return error.to_response()
-        task_data: TaskData = await task_service.submit_task(task=task, service=service)
-        return TaskResponse(status=TaskStatus.SUCCESS, data=task_data)
-    except TaskAPIException as error:
-        return error.to_response()
-    except Exception as error:
-        logger.error(msg=f"Internal server error: {error}")
-        return InternalServerError(details=str(error)).to_response()
-
+    """    
+    task_data: TaskData = await task_service.submit_task(task=task, service=service)
+    return TaskResponse(status=TaskStatus.SUCCESS, data=task_data)
 
 @router.get(
     path="/services/{service}/tasks/{task_id}",
@@ -126,17 +120,19 @@ async def get_task(
         Path(default=..., description="Identifiant unique de la tâche à récupérer."),
     ],
     task_service: Annotated[TaskService, Depends(TaskService)],
+    client_id: Annotated[str, Depends(auth_guard)]
 ) -> TaskResponse | JSONResponse:
     """
     Récupère le statut d'une tâche via son identifiant.
     - **task_id** : identifiant unique de la tâche
     """
-    try:
-        task_info: TaskData | None = await task_service.poll_task(
-            task_id=task_id, service=service
-        )
-        if not task_info:
-            return TaskNotFound().to_response()
-        return TaskResponse(status=TaskStatus.PENDING, data=task_info)
-    except Exception as error:
-        return InternalServerError(details=str(error)).to_response()
+    task_info: TaskData | None = await task_service.poll_task(
+        task_id=task_id, service=service
+    )
+    if not task_info:
+        raise TaskNotFound
+    return TaskResponse(status=TaskStatus.PENDING, data=task_info)
+
+
+
+

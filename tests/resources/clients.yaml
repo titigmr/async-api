@@ -1,5 +1,4 @@
-- name: client1
-  client_id: ZERJGbnkzjhejuyiyaze
+- client_id: client1
   client_secret: $CLIENT_SECRET_1
   authorizations:
     # - service: all # all access
@@ -8,5 +7,4 @@
       quotas: 100 
     - service: example2
       # quotas: 100 # Default: No quotas
-- name: client2
-  client_id: aERJGbnkzjhejuyiyaze
+- client_id: client2

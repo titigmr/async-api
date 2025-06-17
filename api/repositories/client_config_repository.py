@@ -14,17 +14,15 @@ class ClientAuthorization:
 class ClientConfig:
     def __init__(
             self,
-            name: str,
             client_id: str,
             client_secret: str | None = None,
             authorizations: dict[str,ClientAuthorization] | None = None):
-        self.name = name
         self.client_id = client_id
         self.client_secret = client_secret
         self.authorizations = authorizations or {}
 
     def __repr__(self):
-        return f"ClientConfig(name={self.name}, client_id={self.client_id}, client_secret={self.client_secret}, authorizations={self.authorizations})"
+        return f"ClientConfig(client_id={self.client_id}, client_secret={self.client_secret}, authorizations={self.authorizations})"
 
 
 class ClientsConfigException(Exception):
@@ -63,9 +61,6 @@ class ClientConfigRepository:
         for config_item in config:
             if not isinstance(config_item, dict):
                 raise ClientsConfigException(f"Invalid configuration item at: {config_item}. Expected a dictionary.")
-            if 'name' not in config_item:
-                raise ClientsConfigException("Each client configuration must contain a 'name' key.")
-            client_name = config_item['name']
             if 'client_id' not in config_item:
                 raise ClientsConfigException("Each client configuration must contain a 'client_id' key.")
             client_id = config_item['client_id']
@@ -75,11 +70,11 @@ class ClientConfigRepository:
             authorisations_part = config_item.get('authorizations', [])
             authorisations: dict[str,ClientAuthorization] = {}
             if not isinstance(authorisations_part, list):
-                raise ClientsConfigException(f"Invalid authorizations format for client {client_name}. Expected a list.")
+                raise ClientsConfigException(f"Invalid authorizations format for client {client_id}. Expected a list.")
 
             for auth in authorisations_part:
                 if not isinstance(auth, dict):
-                    raise ClientsConfigException(f"Invalid authorization item for client {client_name}: {auth}. Expected a dictionary.")
+                    raise ClientsConfigException(f"Invalid authorization item for client {client_id}: {auth}. Expected a dictionary.")
                 if 'service' not in auth:
                     raise ClientsConfigException("Each authorization must contain a 'service' key.")
                 service_name = auth['service']
@@ -87,12 +82,11 @@ class ClientConfigRepository:
                 authorisations[service_name] = ClientAuthorization(service=service_name, quotas=quotas)
 
             client_config = ClientConfig(
-                name=client_name,
                 client_id=client_id,
                 client_secret=client_secret,
                 authorizations=authorisations
             )
-            clients[client_name] = client_config
+            clients[client_id] = client_config
         return clients
 
     @staticmethod
@@ -119,3 +113,10 @@ class ClientConfigRepository:
         if ClientConfigRepository.CLIENTS is None:
             raise ClientsConfigException("Clients configuration not loaded. Call load_clients_config first.")
         return ClientConfigRepository.CLIENTS
+    
+    def get_client(self, client_id: str) -> ClientConfig | None:
+        """
+        Returns the client configuration for the given client_id.
+        If the client does not exist, returns None.
+        """
+        return self.all_clients().get(client_id)

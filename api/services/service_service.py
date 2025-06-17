@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import Depends
 from api.repositories.services_config_repository import ServicesConfigRepository

@@ -17,7 +17,7 @@ from api.schemas import (
     TaskRequest,
 )
 from api.schemas.enum import TaskStatus
-from api.schemas.errors import BodyValidationError
+from api.schemas.errors import BodyValidationError, ServiceNotFound
 from api.services import ServiceService, send_task_to_queue
 from api.services.queue_service import get_broker
 
@@ -50,6 +50,9 @@ class TaskService:
 
     async def poll_task(self, task_id: str, service: str) -> TaskData | None:
         """Poll a task by its ID"""
+        if not self.service_service.check_service_exists(service=service):
+            raise ServiceNotFound
+
         task_info: Row[Tuple[Task]] | None = await self.task_repository.get_task_by_id(
             task_id=task_id, service=service
         )
@@ -67,6 +70,7 @@ class TaskService:
 
     async def submit_task(self, task: TaskRequest, service: str) -> TaskData:
         """Submit a new task"""
+        self.service_service.check_service_exists(service=service)
         self.check_service_schema(service=service, body=task.body)
         task_id = str(uuid.uuid4())
         queue_message = QueueTask(

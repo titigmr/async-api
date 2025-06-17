@@ -1,6 +1,5 @@
 from typing import Any, AsyncGenerator
 
-from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,

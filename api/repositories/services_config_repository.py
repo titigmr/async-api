@@ -2,8 +2,6 @@
 import json
 from typing import Any
 
-from fastapi import Depends
-
 from api.core.utils import logger
 import yaml
 
