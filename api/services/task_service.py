@@ -50,7 +50,7 @@ class TaskService:
 
     async def poll_task(self, task_id: str, service: str) -> TaskData | None:
         """Poll a task by its ID"""
-        if not self.service_service.check_service_exists(service=service):
+        if not self.service_service.get_service(service_name=service):
             raise ServiceNotFound
 
         task_info: Row[Tuple[Task]] | None = await self.task_repository.get_task_by_id(
