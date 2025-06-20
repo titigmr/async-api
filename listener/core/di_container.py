@@ -1,5 +1,5 @@
 
-from api.core.config import Settings
+from api.core.config import Settings, settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.repositories.client_config_repository import ClientConfigRepository
@@ -8,6 +8,8 @@ from api.repositories.task_repository import TaskRepository
 from api.services.client_service import ClientService
 from api.services.service_service import ServiceService
 from listener.core.task_aware_async_session import TaskAwareAsyncSession
+from listener.services.message_service import MessageService
+from listener.services.queue_listener import QueueListener
 from listener.services.app import ListenerApp
 
 
@@ -16,6 +18,7 @@ class DIContainer:
     def __init__(self):
         # Singletons
         self.settings = Settings()
+        ServicesConfigRepository.load_services_config(settings.SERVICES_CONFIG_FILE)
 
     def session(self) -> AsyncSession :
         return TaskAwareAsyncSession()  # type: ignore
@@ -23,17 +26,14 @@ class DIContainer:
     def task_repository(self):
         return TaskRepository(self.session())
     
+    def message_service(self):
+        return MessageService(self.task_repository(),self.session())
+
     def service_repository(self):
         return ServicesConfigRepository()
 
-    def service_service(self):
-        return ServiceService(service_repository=self.service_repository())
-
-    def client_repository(self):
-        return ClientConfigRepository()
-
-    def client_service(self):
-        return ClientService(client_config_repository=self.client_repository())
-
-    def app(self):
-        return ListenerApp(self.task_repository())
+    def app(self) -> QueueListener :
+        return QueueListener(
+            self.message_service(),
+            self.service_repository(), 
+            self.settings.BROKER_URL)
