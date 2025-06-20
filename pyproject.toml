@@ -5,13 +5,13 @@ description = "Generic api for async tasks"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "alembic>=1.16.1",
-    "fastapi>=0.115.12",
+    "alembic>=1.16.2",
+    "fastapi>=0.115.13",
     "kombu>=5.5.4",
     "psycopg2-binary>=2.9.10",
     "pydantic-settings>=2.9.1",
     "requests>=2.32.4",
-    "sqlalchemy>=2.0.41",
+    "sqlalchemy[asyncio]>=2.0.41",
     "sqlmodel>=0.0.24",
     "toml>=0.10.2",
     "uvicorn>=0.34.3",
@@ -20,10 +20,11 @@ dependencies = [
     "prometheus-client>=0.18.0",
     "prometheus-fastapi-instrumentator>=7.1.0",
     "pyyaml>=6.0.2",
+    "aio-pika>=9.5.5",
 ]
 
 [dependency-groups]
 dev = [
     "coverage>=7.9.1",
-    "pytest>=8.4.0",
+    "pytest>=8.4.1",
 ]

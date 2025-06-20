@@ -8,7 +8,7 @@ DEVELOPMENT="${DEVELOPMENT:-false}"
 
 if [[ "${DEVELOPMENT,,}" == "true" ]]; then
     echo "Mode développement activé"
-    uvicorn --host "$API_HOST" --port "$API_PORT" api.main:app --reload --reload-delay 0.25
+    uvicorn --host "$API_HOST" --port "$API_PORT" api.main:app --reload 
 else
     exec uvicorn --host "$API_HOST" \
         --port "$API_PORT" api.main:app \
