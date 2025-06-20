@@ -22,5 +22,4 @@ class TaskAwareAsyncSession:
             return session
     
     def __getattr__(self, name):
-        print(f"name: {name}")
         return getattr(self._get_wrapped_session(), name)
