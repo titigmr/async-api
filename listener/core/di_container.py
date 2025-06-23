@@ -22,7 +22,7 @@ class DIContainer:
         self.settings = Settings()
     
         # Setup log level
-        logger.setLevel(self.settings.LOG_LEVEL)
+        logger.setLevel(self.settings.LISTENER_LOG_LEVEL)
         
         # Prefetch service config
         logger.info("----------------------------")
@@ -40,10 +40,10 @@ class DIContainer:
         return TaskRepository(self.session())
     
     def http_notifier(self):
-        return HttpNotifier(1)
+        return HttpNotifier(self.settings.LISTENER_NOTIFIER_RETRY)
 
     def amqp_notifier(self):
-        return AmqpNotifier(1)
+        return AmqpNotifier(self.settings.LISTENER_NOTIFIER_RETRY)
     
     def notification_service(self): 
         return NotificationService([
