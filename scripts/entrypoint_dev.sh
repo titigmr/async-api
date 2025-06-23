@@ -7,16 +7,14 @@ APP="${APP:-api}"
 # API MODE
 if [[ "${APP,,}" == "api" ]]; then
     echo "===== API ====="
-    exec uvicorn --host "$API_HOST" \
-        --port "$API_PORT" api.main:app \
-        --workers ${WORKERS:-1} \
-        --log-level ${LOG_LEVEL:-info}
-
+    echo "Mode développement"
+    uvicorn --host "$API_HOST" --port "$API_PORT" api.main:app --reload 
 fi
 
 # LISTENER MODE
 if [[ "${APP}" == "listener" ]]; then
     echo "===== LISTENER ====="
+    echo "Mode développement"
     export PYTHONPATH=$(pwd)/
-    exec python3 listener/main.py
+    nodemon --legacy-watch --exec python3 listener/main.py
 fi

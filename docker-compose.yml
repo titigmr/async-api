@@ -6,7 +6,9 @@ services:
     volumes:
       - ${PWD}/api:/app/api
       - ${PWD}/config:/app/config
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
     ports:
     - "8000:8000"
     depends_on:
@@ -23,7 +25,9 @@ services:
       - ${PWD}/api:/app/api
       - ${PWD}/listener:/app/listener
       - ${PWD}/config:/app/config
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
     depends_on:
     - db
     - broker
