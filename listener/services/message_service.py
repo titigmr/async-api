@@ -3,7 +3,7 @@ import json
 from api.repositories.task_repository import TaskRepository
 
 from typing import Annotated, Literal, Union
-from pydantic import BaseModel, Field, Json, TypeAdapter
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas.enum import TaskStatus

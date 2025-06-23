@@ -5,7 +5,6 @@ services:
     container_name: api
     volumes:
       - ${PWD}/api:/app/api
-      - ${PWD}/json_schemas:/json_schemas
       - ${PWD}/config:/app/config
     build: .
     ports:
@@ -15,6 +14,23 @@ services:
     - broker
     env_file:
     - .env
+    environment:
+      - APP=api
+  listener:
+    image: api:latest
+    container_name: listener
+    volumes:
+      - ${PWD}/api:/app/api
+      - ${PWD}/listener:/app/listener
+      - ${PWD}/config:/app/config
+    build: .
+    depends_on:
+    - db
+    - broker
+    env_file:
+    - .env
+    environment:
+      - APP=listener
   consumer:
     image: consumer:latest
     container_name: consumer

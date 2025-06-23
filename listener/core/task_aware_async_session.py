@@ -1,4 +1,3 @@
-import asyncio
 from contextvars import ContextVar
 from sqlalchemy.ext.asyncio import AsyncSession
 

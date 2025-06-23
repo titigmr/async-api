@@ -39,12 +39,23 @@ class QueueListener:
             self.consumer_task.append(task)
         return inner_message_handler
 
+    async def wait_for_connection(self) -> aio_pika.RobustConnection:
+        while True:
+            try:
+                logger.info("Connecting to rabbitmq...")
+                connection = await aio_pika.connect_robust(self.rabbit_url)
+                logger.info("Successfully connected.")
+                return connection # type: ignore
+            except Exception as e:
+                logger.error(f"Connection failure : {e}. Retry in 5s...")
+                await asyncio.sleep(5)
+
     async def start(self):
 
         logger.info("----------------------------")
         logger.info(f"⏳ Connecting to the output queues (concurrency: {self.concurrency})...")
+        connection = await self.wait_for_connection()
 
-        connection = await aio_pika.connect_robust(self.rabbit_url)
         channel = await connection.channel()
         await channel.set_qos(prefetch_count=self.concurrency)
 
