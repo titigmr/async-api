@@ -3,7 +3,7 @@ import json
 from typing import Literal
 import aio_pika
 from pydantic import BaseModel, Field
-
+from listener.core.logger import logger
 from listener.services.notifier_service import BaseNotifier, NotificationException
 
 
@@ -40,11 +40,14 @@ class AmqpNotifier(BaseNotifier):
                 await channel.declare_queue(amqp_callback.queue, durable=True)
                 pika_message = aio_pika.Message(body=json.dumps(message).encode())
                 await channel.default_exchange.publish(pika_message, routing_key=amqp_callback.queue)
+                logger.debug("Amqp notification send successfully.")
+
         except Exception as e:
             if retry < self.max_reties:
                 wait_time = pow(retry + 1,2)
-                print(f"Retry in {wait_time}s")
+                logger.debug(f"Failure, about to retry n°{retry+1}/{self.max_reties} in {wait_time}s...")
                 await asyncio.sleep(wait_time)
                 await self.notify_retry(amqp_callback,message, retry + 1)
                 return
+            logger.debug("No more retries")
             raise NotificationException(f"Error during the amqp call for callback: {amqp_callback}",e)

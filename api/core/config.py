@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     BROKER_TYPE: str = "rabbitmq"
     SERVICES_CONFIG_FILE: str = "./config/services.yaml"
     CLIENTS_CONFIG_FILE: str = "./config/clients.yaml"
+    LOG_LEVEL: str = "INFO"
 
 settings = Settings()
 

@@ -2,26 +2,36 @@
 from api.core.config import Settings, settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.repositories.client_config_repository import ClientConfigRepository
 from api.repositories.services_config_repository import ServicesConfigRepository
 from api.repositories.task_repository import TaskRepository
-from api.services.client_service import ClientService
-from api.services.service_service import ServiceService
+from listener.core.logger import logger
 from listener.core.task_aware_async_session import TaskAwareAsyncSession
 from listener.services.message_service import MessageService
 from listener.services.notifier_service import NotificationService
 from listener.services.notifiers.amqp_notifier import AmqpNotifier
 from listener.services.notifiers.http_notifier import HttpNotifier
 from listener.services.queue_listener import QueueListener
-from listener.services.app import ListenerApp
 
 
 class DIContainer:
 
     def __init__(self):
         # Singletons
+
+        # Loading setting
         self.settings = Settings()
+    
+        # Setup log level
+        logger.setLevel(self.settings.LOG_LEVEL)
+        
+        # Prefetch service config
+        logger.info("----------------------------")
+        logger.info("⏳ Loading services configuration ...")
+        logger.info(f"Using services config file: {settings.SERVICES_CONFIG_FILE}")
         ServicesConfigRepository.load_services_config(settings.SERVICES_CONFIG_FILE)
+        for service in ServicesConfigRepository.SERVICES:
+            logger.info(f"- Service loaded: {service}")
+        logger.info("🤗 Done.")
 
     def session(self) -> AsyncSession :
         return TaskAwareAsyncSession()  # type: ignore

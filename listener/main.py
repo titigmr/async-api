@@ -10,12 +10,14 @@
 import asyncio
 from time import sleep
 from listener.core.di_container import DIContainer
+from listener.core.logger import logger
 
 async def main():
+    logger.info("----------------------------")
+    logger.info("🚀 Starting the listener")
+    logger.info("----------------------------")
     container = DIContainer()
-    print("started.")
     await container.app().start()
-    print("started.")
     await asyncio.Event().wait()
 
 

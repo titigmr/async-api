@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, Json, TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas.enum import TaskStatus
+from listener.core.logger import logger
 from listener.services.notifier_service import NotificationService
 
 #---------------------------------
@@ -56,9 +57,18 @@ class MessageService:
         self.notification_service = notification_service
         self.session = session
 
+    def to_onliner_message(self, message: str) -> str:
+        """Remove all CR + LF from the json message to display it in one line.
+        """
+        raw_message = message.replace("\n","")
+        raw_message = raw_message.replace("\r","")
+        return raw_message
+
     async def process(self, message: str, service_name: str):
+        logger.info(f"Start processing '{self.to_onliner_message(message)}'")
+
         try:
-            print(f"Processing {message}")
+            # Convert the json into MessageFromWorker type
             message_object = self.unmarshall_message(message)
 
             task_id = message_object.task_id
@@ -73,20 +83,26 @@ class MessageService:
             if isinstance(data, FailureMessage):
                 await self.process_failure_message(task_id,service_name,data)
 
+            logger.info(f"End processing '{self.to_onliner_message(message)}'")
+
+            logger.debug("commit()")
             await self.session.commit()
         except Exception as e:
+            logger.debug("rollback()")
             await self.session.rollback()
             raise e
         finally:
+            logger.debug("close connection.")
             await self.session.close()
 
     def unmarshall_message(self,message: str) -> MessageFromWorker :
         try:
             return MessageFromWorker.model_validate_json(message)
         except Exception as e:
-            raise MessageServiceError(f"Not a valid message: '{message}'")
+            raise MessageServiceError(f"Not a valid message: '{self.to_onliner_message(message)}'")
 
     async def process_start_message(self, task_id: str,service_name: str,data: StartMessage):
+        logger.debug("Handling start message")
         task = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
             raise MessageServiceError(f"Task not found, task_id: '{task_id}', service_name: '{service_name}'")
@@ -97,12 +113,14 @@ class MessageService:
         task.progress = 0.0                         # type: ignore
 
     async def process_progress_message(self, task_id: str,service_name: str,data: ProgressMessage):
+        logger.debug("Handling progress message")
         task = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
             raise MessageServiceError(f"Task not found, task_id: '{task_id}', service_name: '{service_name}'")
         task.progress = data.progress       # type: ignore
 
     async def process_success_message(self, task_id: str,service_name: str,data: SuccessMessage):
+        logger.debug("Handling success message")
         task = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
             raise MessageServiceError(f"Task not found, task_id: '{task_id}', service_name: '{service_name}'")
@@ -126,10 +144,11 @@ class MessageService:
                 await self.notification_service.notify(callback_dict,message)
                 task.notification_status = "SUCCESS"  # type: ignore
             except Exception as e:
-                print(f"Notification failure: {e}")
+                logger.error(f"Notification failure for task_id '{task_id}': {e}")
                 task.notification_status = "FAILURE" # type: ignore
 
     async def process_failure_message(self, task_id: str,service_name: str,data: FailureMessage):
+        logger.debug("Handling failure message")
         task = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
             raise MessageServiceError(f"Task not found, task_id: '{task_id}', service_name: '{service_name}'")
@@ -153,5 +172,5 @@ class MessageService:
                 await self.notification_service.notify(callback_dict,message)
                 task.notification_status = "SUCCESS"  # type: ignore
             except Exception as e:
-                print(f"Notification failure: {e}")
+                logger.error(f"Notification failure for task_id '{task_id}': {e}")
                 task.notification_status = "FAILURE"  # type: ignore

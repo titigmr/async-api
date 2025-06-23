@@ -1,11 +1,11 @@
 import asyncio
 from contextvars import Context
 from aio_pika.abc import AbstractIncomingMessage
-from functools import partial
 
 import aio_pika
 
 from api.repositories.services_config_repository import ServicesConfigRepository
+from listener.core.logger import logger
 from listener.services.message_service import MessageService, MessageServiceError
 
 async def message_handler(message: AbstractIncomingMessage):
@@ -29,7 +29,7 @@ class QueueListener:
             try: # auto-ack à la fin du bloc
                 await self.message_service.process(message.body.decode(), service_name=service_name)
             except MessageServiceError as e:
-                print(f"Error: {e}")
+                logger.error(f"Error: {e}")
 
     def message_handler(self,service_name: str):
         async def inner_message_handler(message: AbstractIncomingMessage):
@@ -38,14 +38,20 @@ class QueueListener:
         return inner_message_handler
 
     async def start(self):
+
+        logger.info("----------------------------")
+        logger.info("⏳ Connecting to the output queues...")
+
         connection = await aio_pika.connect_robust(self.rabbit_url)
         channel = await connection.channel()
         await channel.set_qos(prefetch_count=20)
 
         for service in self.service_repository.all_services().values():
-            print(f"Listen service '{service.name}' on response queue '{service.out_queue}'")
+            logger.info(f"- Listen service '{service.name}' on response queue '{service.out_queue}'")
             queue = await channel.declare_queue(service.out_queue, durable=True)
             await queue.consume(self.message_handler(service.name))
+
+        logger.info("🤗 Done.")
 
   
 

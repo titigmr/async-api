@@ -4,7 +4,7 @@ import ssl
 from typing import Literal
 from pydantic import BaseModel, Field
 import aiohttp
-
+from listener.core.logger import logger
 
 class HttpCallback(BaseModel):
     type: Literal["http"]
@@ -44,14 +44,15 @@ class HttpNotifier(BaseNotifier):
                     if response.status != 200:
                         raise NotificationException(f"Bad response status '{response.status}' for callback: {http_callback}")
                     else:
-                        print("Notification send.")
+                        logger.debug("Http notification send successfully.")
         except Exception as e:
             if retry < self.max_reties:
                 wait_time = pow(retry + 1,2)
-                print(f"Retry in {wait_time}s")
+                logger.debug(f"Failure, about to retry n°{retry+1}/{self.max_reties} in {wait_time}s...")
                 await asyncio.sleep(wait_time)
                 await self.notify_retry(http_callback,message, retry + 1)
                 return
+            logger.debug("No more retries")
             raise NotificationException(f"Error during the http call for callback: {http_callback}",e)
 
 
