@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     SERVICES_CONFIG_FILE: str = "./config/services.yaml"
     CLIENTS_CONFIG_FILE: str = "./config/clients.yaml"
     LOG_LEVEL: str = "INFO"
+    LISTENER_CONCURRENCY: int = 20
 
 settings = Settings()
 

@@ -52,7 +52,10 @@ class DIContainer:
             ])
 
     def message_service(self):
-        return MessageService(self.task_repository(),self.notification_service(),self.session())
+        return MessageService(
+            self.task_repository(),
+            self.notification_service(),
+            self.session())
 
     def service_repository(self):
         return ServicesConfigRepository()
@@ -61,4 +64,5 @@ class DIContainer:
         return QueueListener(
             self.message_service(),
             self.service_repository(), 
-            self.settings.BROKER_URL)
+            self.settings.BROKER_URL,
+            self.settings.LISTENER_CONCURRENCY)

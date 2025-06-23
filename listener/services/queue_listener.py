@@ -13,10 +13,12 @@ class QueueListener:
     def __init__(self, 
                  message_service: MessageService,
                  service_repository: ServicesConfigRepository, 
-                 rabbitmq_url: str):
+                 rabbitmq_url: str,
+                 concurrency: int = 20):
         self.service_repository = service_repository
         self.rabbit_url = rabbitmq_url
         self.message_service = message_service
+        self.concurrency = concurrency
         pass
 
     async def process_message(self,message: AbstractIncomingMessage,service_name: str):
@@ -35,11 +37,11 @@ class QueueListener:
     async def start(self):
 
         logger.info("----------------------------")
-        logger.info("⏳ Connecting to the output queues...")
+        logger.info(f"⏳ Connecting to the output queues (concurrency: {self.concurrency})...")
 
         connection = await aio_pika.connect_robust(self.rabbit_url)
         channel = await connection.channel()
-        await channel.set_qos(prefetch_count=20)
+        await channel.set_qos(prefetch_count=self.concurrency)
 
         for service in self.service_repository.all_services().values():
             logger.info(f"- Listen service '{service.name}' on response queue '{service.out_queue}'")
