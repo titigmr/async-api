@@ -43,7 +43,7 @@ class QueueListener:
         await channel.set_qos(prefetch_count=20)
 
         for service in self.service_repository.all_services().values():
-            print(f"Liste for '{service.name}' response on queue '{service.out_queue}'")
+            print(f"Listen service '{service.name}' on response queue '{service.out_queue}'")
             queue = await channel.declare_queue(service.out_queue, durable=True)
             await queue.consume(self.message_handler(service.name))
 

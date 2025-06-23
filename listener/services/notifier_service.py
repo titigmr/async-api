@@ -1,22 +1,41 @@
 from typing import Generic, Literal, TypeVar
-from pydantic import BaseModel, Field
-
-#---------------------------------
-# RabbitMQ Messages
-#---------------------------------
-class SuccessNotification(BaseModel):
-    task_id:  str = Field(default=..., description="Id de la tâche.")
-    status:  str = Field(default=..., description="Status de la tâche.")
+from pydantic import BaseModel, Field, TypeAdapter
 
 
 #---------------------------------
-# Service Exceptions
+# Notification service exception
 #---------------------------------
-T = TypeVar('T')
-class AbstractNotifier(Generic[T]):
-    def accept(self, type: str):
+class NotificationException(Exception):
+    pass
+
+#---------------------------------
+# Base Notifier
+#---------------------------------
+class BaseNotifier:
+    def accept(self, callback: dict) -> bool:
+        return False
+
+    async def notify(self, callback: dict, message: dict):
         pass
 
-    def notify(self, message: SuccessNotification):
-        pass
+#---------------------------------
+# Notification service
+#---------------------------------
+class NotificationService:
+    def __init__(self, notifiers: list[BaseNotifier]):
+        self.notifiers = notifiers
+
+    def find_notifier_for_message(self, callback: dict) -> BaseNotifier | None:
+        for notifier in self.notifiers:
+            if notifier.accept(callback):
+                return notifier
+        return None
+
+    async def notify(self, callback: dict, message: dict):
+        notifier = self.find_notifier_for_message(callback)
+        if notifier is None:
+            raise NotificationException(f"No notifier found for callback {callback}")
+        await notifier.notify(callback,message)
+
+
 

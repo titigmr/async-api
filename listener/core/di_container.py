@@ -9,6 +9,9 @@ from api.services.client_service import ClientService
 from api.services.service_service import ServiceService
 from listener.core.task_aware_async_session import TaskAwareAsyncSession
 from listener.services.message_service import MessageService
+from listener.services.notifier_service import NotificationService
+from listener.services.notifiers.amqp_notifier import AmqpNotifier
+from listener.services.notifiers.http_notifier import HttpNotifier
 from listener.services.queue_listener import QueueListener
 from listener.services.app import ListenerApp
 
@@ -26,8 +29,20 @@ class DIContainer:
     def task_repository(self):
         return TaskRepository(self.session())
     
+    def http_notifier(self):
+        return HttpNotifier(1)
+
+    def amqp_notifier(self):
+        return AmqpNotifier(1)
+    
+    def notification_service(self): 
+        return NotificationService([
+            self.http_notifier(),
+            self.amqp_notifier(),
+            ])
+
     def message_service(self):
-        return MessageService(self.task_repository(),self.session())
+        return MessageService(self.task_repository(),self.notification_service(),self.session())
 
     def service_repository(self):
         return ServicesConfigRepository()

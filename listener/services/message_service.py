@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, Json, TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.schemas.enum import TaskStatus
+from listener.services.notifier_service import NotificationService
 
 #---------------------------------
 # RabbitMQ Messages
@@ -34,19 +35,6 @@ class MessageFromWorker(BaseModel):
     data: InnerMessage
 
 
-#---------------------------------
-# Callback types
-#---------------------------------
-class HttpCallback(BaseModel):
-    type: Literal["http"]
-    url:  str = Field(default=..., description="Url.")
-
-class HttpsCallback(BaseModel):
-    type: Literal["https"]
-    url:  str = Field(default=..., description="Url.")
-    skip_tls: bool = Field(default=False, description="Disable TLS check.")
-
-Callback = Annotated[Union[HttpCallback, HttpsCallback], Field(discriminator='type')]
 
 #---------------------------------
 # Service Exceptions
@@ -59,15 +47,19 @@ class MessageServiceError(Exception):
 #---------------------------------
 class MessageService:
 
-    def __init__(self, task_repository: TaskRepository, session: AsyncSession):
+    def __init__(self, 
+                 task_repository: TaskRepository, 
+                 notification_service: NotificationService,
+                 session: AsyncSession,
+                 ):
         self.task_repository = task_repository
+        self.notification_service = notification_service
         self.session = session
 
     async def process(self, message: str, service_name: str):
         try:
-            print(f"[x] Processing {message}")
+            print(f"Processing {message}")
             message_object = self.unmarshall_message(message)
-            print(f">>>>> {message_object}")
 
             task_id = message_object.task_id
             data: InnerMessage = message_object.data
@@ -111,7 +103,6 @@ class MessageService:
         task.progress = data.progress       # type: ignore
 
     async def process_success_message(self, task_id: str,service_name: str,data: SuccessMessage):
-        print("success")
         task = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
             raise MessageServiceError(f"Task not found, task_id: '{task_id}', service_name: '{service_name}'")
@@ -120,14 +111,23 @@ class MessageService:
         task.end_date = datetime.datetime.now()     # type: ignore
         task.response = json.dumps(data.response)   # type: ignore
         
-        # Nous voulons que la base soit commit avant d'appeler le callback
-        callback_string: dict = task.callback # type: ignore
-        await self.session.commit()
-
-        # Todo: Callback
-        if callback_string is not None:
-            callback = self.unmarshall_callback(callback_string)
-            print(f"{type(callback)}")
+        callback_dict: dict = task.callback # type: ignore
+        if callback_dict is not None:
+            message = {
+                "task_id": task_id,
+                "status": "SUCCESS",
+                "submition_date": task.submition_date.isoformat(),
+                "start_date": task.start_date.isoformat(),
+                "end_date": task.end_date.isoformat(),
+                "progress": 100.0,
+                "response": data.response
+            }
+            try:
+                await self.notification_service.notify(callback_dict,message)
+                task.notification_status = "SUCCESS"  # type: ignore
+            except Exception as e:
+                print(f"Notification failure: {e}")
+                task.notification_status = "FAILURE" # type: ignore
 
     async def process_failure_message(self, task_id: str,service_name: str,data: FailureMessage):
         task = await self.task_repository.get_task_by_id(task_id, service_name)
@@ -137,12 +137,21 @@ class MessageService:
         task.status   = TaskStatus.FAILURE          # type: ignore
         task.end_date = datetime.datetime.now()     # type: ignore
         task.error_message = data.error_message     # type: ignore
-        # Nous voulons que la base soit commit avant d'appeler le callback
-        await self.session.commit()
 
-    def unmarshall_callback(self,callback_dict: dict) -> Callback :
-        try:
-            adapter = TypeAdapter(Callback)
-            return adapter.validate_python(callback_dict)
-        except Exception as e:
-            raise MessageServiceError(f"Not a valid callback: '{callback_dict}'")
+        callback_dict: dict = task.callback # type: ignore
+        if callback_dict is not None:
+            message = {
+                "task_id": task_id,
+                "status": "SUCCESS",
+                "submition_date": task.submition_date.isoformat(),
+                "start_date": task.start_date.isoformat(),
+                "end_date": task.end_date.isoformat(),
+                "progress": task.progress,
+                "error_message": data.error_message 
+            }
+            try:
+                await self.notification_service.notify(callback_dict,message)
+                task.notification_status = "SUCCESS"  # type: ignore
+            except Exception as e:
+                print(f"Notification failure: {e}")
+                task.notification_status = "FAILURE"  # type: ignore
