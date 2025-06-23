@@ -8,11 +8,6 @@ from api.repositories.services_config_repository import ServicesConfigRepository
 from listener.core.logger import logger
 from listener.services.message_service import MessageService, MessageServiceError
 
-async def message_handler(message: AbstractIncomingMessage):
-    pass
-        # Lance le traitement sans attendre (non bloquant)
-        #asyncio.create_task(process_message(message)) 
-
 class QueueListener:
 
     def __init__(self, 
