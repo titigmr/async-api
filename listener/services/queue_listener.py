@@ -1,5 +1,6 @@
 import asyncio
 from contextvars import Context
+import signal
 from aio_pika.abc import AbstractIncomingMessage
 
 import aio_pika
@@ -19,6 +20,9 @@ class QueueListener:
         self.rabbit_url = rabbitmq_url
         self.message_service = message_service
         self.concurrency = concurrency
+
+        self.consumer_task: list[asyncio.Task] = []
+        self.stop_event = asyncio.Event()
         pass
 
     async def process_message(self,message: AbstractIncomingMessage,service_name: str):
@@ -31,7 +35,8 @@ class QueueListener:
     def message_handler(self,service_name: str):
         async def inner_message_handler(message: AbstractIncomingMessage):
             # Non blocking message processing (another task is created)
-            asyncio.create_task(self.process_message(message=message,service_name=service_name),context=Context())
+            task = asyncio.create_task(self.process_message(message=message,service_name=service_name),context=Context())
+            self.consumer_task.append(task)
         return inner_message_handler
 
     async def start(self):
@@ -47,9 +52,23 @@ class QueueListener:
             logger.info(f"- Listen service '{service.name}' on response queue '{service.out_queue}'")
             queue = await channel.declare_queue(service.out_queue, durable=True)
             await queue.consume(self.message_handler(service.name))
-
         logger.info("🤗 Done.")
 
+        # Setup signal handler
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(signal.SIGINT, self.stop)
+        loop.add_signal_handler(signal.SIGTERM, self.stop)
+        
+        # Wait for a stop signal
+        await self.stop_event.wait()
+        logger.info("💥 Stop signal received, closing connection.")
+        for task in self.consumer_task:
+            task.cancel()
+            await task
+        await connection.close()
+
+    def stop(self):
+        self.stop_event.set()
   
 
 
