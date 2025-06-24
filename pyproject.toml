@@ -26,7 +26,23 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "aiosqlite>=0.21.0",
     "coverage>=7.9.1",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.0.0",
 ]
+
+[tool.coverage.run]
+source = [
+    ".",
+    # "api/api/v1/routes"
+]
+command_line = "-m pytest --junitxml=junit.xml"
+omit = [
+    "tests/*",
+]
+
+[tool.coverage.report]
+skip_covered = true
+precision = 2
+sort = "-miss"
