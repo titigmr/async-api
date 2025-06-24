@@ -49,7 +49,9 @@ class TaskRepository:
         )
         result_count: Result[Tuple[int]] = await self.db.execute(statement=stmt_count)
         position: int | None = result_count.scalar_one_or_none()
-        return position
+        if position is None:
+            return 1
+        return position + 1
 
     async def count_pending_tasks_for_service(self, service: str) -> int:
         result: Result[Tuple[int]] = await self.db.execute(

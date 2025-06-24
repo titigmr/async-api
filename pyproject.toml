@@ -35,7 +35,6 @@ dev = [
 [tool.coverage.run]
 source = [
     ".",
-    # "api/api/v1/routes"
 ]
 command_line = "-m pytest --junitxml=junit.xml"
 omit = [
