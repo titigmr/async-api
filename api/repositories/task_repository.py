@@ -50,3 +50,30 @@ class TaskRepository:
         result_count: Result[Tuple[int]] = await self.db.execute(statement=stmt_count)
         position: int | None = result_count.scalar_one_or_none()
         return position
+
+    async def count_pending_tasks_for_service(self, service: str) -> int:
+        result: Result[Tuple[int]] = await self.db.execute(
+            statement=select(func.count()).where(
+                (Task.service == service)
+                & (Task.status == TaskStatus.PENDING)
+            )
+        )
+        position: int | None = result.scalar_one_or_none()
+        if position is None:
+            return 0
+        else:
+            return position
+        
+    async def count_pending_tasks_for_service_and_client(self, service: str, client_id: str) -> int:
+        result: Result[Tuple[int]] = await self.db.execute(
+            statement=select(func.count()).where(
+                (Task.service == service)
+                & (Task.status == TaskStatus.PENDING)
+                & (Task.client_id == client_id)
+            )
+        )
+        position: int | None = result.scalar_one_or_none()
+        if position is None:
+            return 0
+        else:
+            return position

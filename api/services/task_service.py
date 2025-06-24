@@ -7,6 +7,7 @@ from sqlalchemy import Row
 
 from api.core.brokers import AbstractBroker
 from api.models import Task
+from api.repositories import task_repository
 from api.repositories.task_repository import TaskRepository
 from api.schemas import (
     QueueData,
@@ -17,8 +18,9 @@ from api.schemas import (
     TaskRequest,
 )
 from api.schemas.enum import TaskStatus
-from api.schemas.errors import BodyValidationError, ServiceNotFound
+from api.schemas.errors import BodyValidationError, Forbidden, ServiceNotFound, TooManyClientsRequests, TooManyRequests
 from api.services import ServiceService, send_task_to_queue
+from api.services.client_service import ClientService
 from api.services.queue_service import get_broker
 
 
@@ -27,10 +29,12 @@ class TaskService:
         self,
         task_repository: Annotated[TaskRepository, Depends(TaskRepository)],
         service_service: Annotated[ServiceService, Depends(ServiceService)],
+        client_service: Annotated[ClientService, Depends(ClientService)],
         broker: Annotated[AbstractBroker, Depends(get_broker)],
     ) -> None:
         self.task_repository: TaskRepository = task_repository
         self.service_service: ServiceService = service_service
+        self.client_service : ClientService = client_service
         self.broker: AbstractBroker = broker
 
     def check_service_schema(self, service: str, body: dict) -> None:
@@ -48,10 +52,16 @@ class TaskService:
                     details=f"Erreur de validation du body avec le json-schema du service '{service_obj.name}': {e}"
                 )
 
-    async def poll_task(self, task_id: str, service: str) -> TaskData | None:
+    async def poll_task(self, task_id: str, service: str, client_id: str) -> TaskData | None:
         """Poll a task by its ID"""
+        # Check service exits
         if not self.service_service.get_service(service_name=service):
             raise ServiceNotFound
+
+        # Check client authorization on service
+        client_authorization = self.client_service.get_client_authorization_for_service(client_id=client_id, service=service) 
+        if client_authorization is None:
+            raise Forbidden
 
         task_info: Row[Tuple[Task]] | None = await self.task_repository.get_task_by_id(
             task_id=task_id, service=service
@@ -68,10 +78,34 @@ class TaskService:
                 status=TaskStatus(value=task_info.status),
             )
 
-    async def submit_task(self, task: TaskRequest, service: str) -> TaskData:
+    async def submit_task(self, task: TaskRequest, service: str, client_id: str) -> TaskData:
         """Submit a new task"""
-        self.service_service.check_service_exists(service=service)
+        # Check service exits
+        service_info = self.service_service.get_service(service_name=service)
+        if service_info is None:
+            raise ServiceNotFound
+        
+        # Check client authorization on service
+        client_authorization = self.client_service.get_client_authorization_for_service(client_id=client_id, service=service) 
+        if client_authorization is None:
+            raise Forbidden
+
+        # Check quotas (service)
+        service_quotas = service_info.quotas
+        if service_quotas is not None:
+            if await self.task_repository.count_pending_tasks_for_service(service=service) >= service_quotas:
+                raise TooManyRequests
+
+
+        # Check quotas (client/service)
+        client_quotas_for_service = client_authorization.quotas
+        if client_quotas_for_service is not None:
+            if await self.task_repository.count_pending_tasks_for_service_and_client(service=service, client_id=client_id) >= client_quotas_for_service:
+                raise TooManyClientsRequests
+
+        # Check schema
         self.check_service_schema(service=service, body=task.body)
+
         task_id = str(uuid.uuid4())
         queue_message = QueueTask(
             task_id=task_id, data=QueueData(message_type="submission", body=task.body)

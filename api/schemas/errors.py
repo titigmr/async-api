@@ -66,6 +66,11 @@ class TooManyRequests(AppException):
     description = "Too many service requests"
 
 
+class TooManyClientsRequests(AppException):
+    status_code = 429
+    number = 429002
+    description = "Too many service requests for the clientId."
+
 class Unauthorized(AppException):
     status_code = 401
     number = 401001

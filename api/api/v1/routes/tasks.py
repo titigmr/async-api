@@ -84,7 +84,7 @@ async def create_task(
     """
     Crée une tâche pour le service demandé.
     """    
-    task_data: TaskData = await task_service.submit_task(task=task, service=service)
+    task_data: TaskData = await task_service.submit_task(task=task, service=service, client_id=client_id)
     return TaskResponse(status=TaskStatus.SUCCESS, data=task_data)
 
 @router.get(
@@ -127,7 +127,7 @@ async def get_task(
     - **task_id** : identifiant unique de la tâche
     """
     task_info: TaskData | None = await task_service.poll_task(
-        task_id=task_id, service=service
+        task_id=task_id, service=service, client_id = client_id
     )
     if not task_info:
         raise TaskNotFound

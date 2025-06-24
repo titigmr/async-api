@@ -31,7 +31,7 @@ class ClientService:
     def get_client_authorization_for_service(self, client_id: str, service: str) -> ClientAuthorization | None:
         """
         Check if a client is allowed to use a specific service.
-        Returns True if the client is allowed, False otherwise.
+        Returns ClientAuthorization if the client is allowed, None otherwise.
         """
         client_config = self.client_config_repository.get_client(client_id)
         if not client_config:
