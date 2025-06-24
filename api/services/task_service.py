@@ -5,9 +5,7 @@ from fastapi import Depends
 from jsonschema import validate
 from sqlalchemy import Row
 
-from api.core.brokers import AbstractBroker
 from api.models import Task
-from api.repositories import task_repository
 from api.repositories.task_repository import TaskRepository
 from api.schemas import (
     QueueData,
@@ -19,9 +17,8 @@ from api.schemas import (
 )
 from api.schemas.enum import TaskStatus
 from api.schemas.errors import BodyValidationError, Forbidden, ServiceNotFound, TooManyClientsRequests, TooManyRequests
-from api.services import ServiceService, send_task_to_queue
+from api.services import ServiceService, QueueSender
 from api.services.client_service import ClientService
-from api.services.queue_service import get_broker
 
 
 class TaskService:
@@ -30,12 +27,12 @@ class TaskService:
         task_repository: Annotated[TaskRepository, Depends(TaskRepository)],
         service_service: Annotated[ServiceService, Depends(ServiceService)],
         client_service: Annotated[ClientService, Depends(ClientService)],
-        broker: Annotated[AbstractBroker, Depends(get_broker)],
+        queue_sender: Annotated[QueueSender, Depends(QueueSender)],
     ) -> None:
         self.task_repository: TaskRepository = task_repository
         self.service_service: ServiceService = service_service
         self.client_service : ClientService = client_service
-        self.broker: AbstractBroker = broker
+        self.queue_sender: QueueSender = queue_sender
 
     def check_service_schema(self, service: str, body: dict) -> None:
         """
@@ -110,7 +107,7 @@ class TaskService:
         queue_message = QueueTask(
             task_id=task_id, data=QueueData(message_type="submission", body=task.body)
         )
-        send_task_to_queue(task_data=queue_message, service=service)
+        await self.queue_sender.send_task_to_queue(queue=service_info.in_queue,task_data=queue_message, service=service)
 
         task_obj = TaskInfo(
             task_id=task_id,
@@ -119,6 +116,8 @@ class TaskService:
             status=TaskStatus.PENDING,
             request=task.body,
             callback=task.callback,
+
         )
         await self.task_repository.create_task_record(task_data_create=task_obj)
-        return TaskData(task_id=task_id, task_position=None, status=TaskStatus.PENDING)
+        task_position = await self.task_repository.get_task_position_by_id(task_id=task_id,service=service)
+        return TaskData(task_id=task_id, task_position=task_position, status=TaskStatus.PENDING)

@@ -1,12 +1,8 @@
 import http
-from http import client
 import logging
-from mimetypes import init
-from multiprocessing.connection import Client
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Header, Path, status
-from fastapi.security import APIKeyHeader, HTTPBasic, HTTPBasicCredentials
+from fastapi import APIRouter, Body, Depends, Path, status
 from starlette.responses import JSONResponse
 
 from api.core.security import auth_guard
@@ -19,14 +15,9 @@ from api.schemas import (
 )
 from api.schemas.enum import ErrorEnum, TaskStatus
 from api.schemas.errors import (
-    InternalServerError,
-    ServiceNotFound,
-    AppException,
     TaskNotFound,
-    Unauthorized,
 )
-from api.services import ServiceService, TaskService
-from api.services.client_service import ClientService
+from api.services import TaskService
 
 router = APIRouter(tags=["Tasks"])
 callback_router = APIRouter()

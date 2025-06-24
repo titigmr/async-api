@@ -1,5 +1,7 @@
+import asyncio
 import logging
 from pathlib import Path
+import sys
 
 import toml
 
@@ -15,12 +17,26 @@ def get_version() -> tuple[str, str]:
     except Exception:
         return "0.0.0", ""
 
+class AsyncTaskFormatter(logging.Formatter):
+    def format(self, record):
+        current_task = asyncio.current_task()
+        record.task_name = current_task.get_name() if current_task else "no-task"
+        return super().format(record)
 
-def get_logger(name: str = "uvicorn") -> logging.Logger:
-    """
-    Retourne un logger configuré identique à celui d'uvicorn.
-    """
-    return logging.getLogger(name=name)
+def setup_loggers():
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = AsyncTaskFormatter(
+        "%(asctime)s | %(levelname)s | %(task_name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    handler.setFormatter(formatter)
+    logger = logging.getLogger("uvicorn")
+    logger_access = logging.getLogger("uvicorn.access")
 
+    for l in [logger, logger_access]:
+        l.handlers = []
+        l.addHandler(handler)
+    return logger
 
-logger: logging.Logger = get_logger()
+ 
+logger: logging.Logger = logging.getLogger("uvicorn")

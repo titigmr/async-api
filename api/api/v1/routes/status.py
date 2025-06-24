@@ -4,11 +4,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.core.brokers import AbstractBroker
 from api.core.database import get_db_session
 from api.core.utils import logger
 from api.schemas import HealthResponse, ReadyComponent, ReadyResponse
-from api.services import get_broker
+from api.services.queue_service import QueueSender
 
 router = APIRouter()
 
@@ -27,7 +26,7 @@ def health() -> HealthResponse:
 )
 async def readiness(
     db: Annotated[AsyncSession, Depends(dependency=get_db_session)],
-    broker: Annotated[AbstractBroker, Depends(dependency=get_broker)],
+    queue_sender: Annotated[QueueSender, Depends(dependency=QueueSender)],
 ) -> ReadyResponse:
     components: dict = {}
 
@@ -42,7 +41,7 @@ async def readiness(
     components["database"] = ReadyComponent(status=db_status, details=db_details)
 
     try:
-        broker.ping()
+        await queue_sender.ping()
         broker_status = "ok"
         broker_details = None
     except Exception as error:

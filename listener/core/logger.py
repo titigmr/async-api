@@ -13,7 +13,7 @@ def get_logger(name: str = "listener") -> logging.Logger:
     if not logger.handlers:
         handler = logging.StreamHandler(sys.stdout)
         formatter = AsyncTaskFormatter(
-            "%(asctime)s | %(levelname)s | %(name)s | %(task_name)s | %(message)s",
+            "%(asctime)s | %(levelname)s | %(task_name)s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
         handler.setFormatter(formatter)

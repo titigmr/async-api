@@ -3,20 +3,14 @@ from fastapi import FastAPI
 from api.api.v1.routes import metrics, services, status, tasks
 from api.core.config import settings
 from api.core.exception_handlers import register_exception_handlers
-from api.core.utils import get_version
+from api.core.utils import get_version, setup_loggers
 from api.core.utils import logger
 from api.repositories.client_config_repository import ClientConfigRepository
 from api.repositories.services_config_repository import ServicesConfigRepository
 
 __version__, __name__ = get_version()
 
-app = FastAPI(
-    title=__name__,
-    version=__version__,
-    # lifespan=lifespan,
-    summary=settings.PROJECT_DESCRIPTION,
-)
-register_exception_handlers(app)
+setup_loggers()
 
 logger.info("----------------------------")
 logger.info("🚀 Starting async API")
@@ -40,6 +34,13 @@ logger.info("🤗 Done.")
 
 logger.info("----------------------------")
 logger.info("⏳ Registering API routes ...")
+app = FastAPI(
+    title=__name__,
+    version=__version__,
+    summary=settings.PROJECT_DESCRIPTION,
+)
+register_exception_handlers(app)
+
 app.include_router(router=services.router, prefix="/v1", tags=["Services"])
 app.include_router(router=tasks.router, prefix="/v1", tags=["Tasks"])
 app.include_router(router=metrics.router, prefix="/internal", tags=["Metrics"])

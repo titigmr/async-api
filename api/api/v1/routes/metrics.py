@@ -5,7 +5,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
 from starlette.responses import Response
 
 from api.services.metrics_service import MetricsService
-
+from api.core.utils import logger
 router = APIRouter()
 
 
