@@ -5,3 +5,8 @@
 __pycache__
 docs/
 htmlcov/
+.vscode/
+*.egg-info/
+dist/
+.ruff_cache/
+*.pyc

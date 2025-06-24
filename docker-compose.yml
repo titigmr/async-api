@@ -6,7 +6,7 @@ services:
     volumes:
       - ${PWD}/api:/app/api
       - ${PWD}/config:/app/config
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.dev
     ports:
@@ -25,7 +25,7 @@ services:
       - ${PWD}/api:/app/api
       - ${PWD}/listener:/app/listener
       - ${PWD}/config:/app/config
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.dev
     depends_on:
@@ -50,6 +50,7 @@ services:
       - .env
   db:
     image: postgres:17
+    container_name: db
     volumes:
       - db-data:/var/lib/postgresql/data
     env_file:

@@ -8,7 +8,7 @@ APP="${APP:-api}"
 if [[ "${APP,,}" == "api" ]]; then
     echo "===== API ====="
     echo "Mode développement"
-    uvicorn --host "$API_HOST" --port "$API_PORT" api.main:app --reload 
+    uvicorn --host "$API_HOST" --port "$API_PORT" api.main:app --reload
 fi
 
 # LISTENER MODE
