@@ -7,8 +7,9 @@ from api.models.task import Task
 from api.repositories.client_config_repository import ClientAuthorization
 from api.repositories.task_repository import TaskRepository
 from api.schemas.enum import TaskStatus
-from api.schemas.errors import BodyValidationError, Forbidden, ServiceNotFound
+from api.schemas.errors import BodyValidationError, Forbidden, ServiceNotFound, TooManyClientsRequests, TooManyRequests
 from api.schemas.service import ServiceInfo
+from api.schemas.task import TaskInfo, TaskRequest
 from api.services.client_service import ClientService
 from api.services.queue_service import QueueSender
 from api.services.service_service import ServiceService
@@ -29,7 +30,7 @@ def task_service() -> TaskService:
             return ServiceInfo(
                 name="svc_no_schema",
                 in_queue="in_queue",
-                out_queue="out_queue"
+                out_queue="out_queue",
             )
         if service_name == "svc_schema":
             return ServiceInfo(
@@ -53,6 +54,13 @@ def task_service() -> TaskService:
                     "additionalProperties": False
                     }
             )
+        if service_name == "svc_quota_10":
+            return ServiceInfo(
+                name="svc_quota_10",
+                in_queue="in_queue",
+                out_queue="out_queue",
+                quotas=10,
+            )
         return None
     service_service_mock.get_service.side_effect = get_service
 
@@ -61,6 +69,8 @@ def task_service() -> TaskService:
     def get_client_authorization_for_service(client_id: str, service: str) -> ClientAuthorization | None:
         if client_id == "client_with_auth_and_no_quota":
             return ClientAuthorization(service=service,quotas=None)
+        if client_id == "client_with_auth_and_quota_10":
+            return ClientAuthorization(service=service,quotas=10)
         pass
     client_service_mock.get_client_authorization_for_service.side_effect = get_client_authorization_for_service
     
@@ -75,6 +85,14 @@ def task_service() -> TaskService:
 
     task_repository_mock.get_task_by_id.side_effect = get_task_by_id
     task_repository_mock.get_task_position_by_id = get_task_position_by_id
+    async def create_task_record(task_data_create: TaskInfo):
+        return Task(task_id = task_data_create.task_id)
+    task_repository_mock.create_task_record = create_task_record
+    #----------
+    # Queue sender
+    async def send_task_to_queue(queue,task_data, service):
+        pass 
+    queue_sender_mock.send_task_to_queue = send_task_to_queue
 
     return TaskService(
                 task_repository=task_repository_mock,
@@ -116,3 +134,54 @@ async def test_pool_task_ok(task_service):
       assert task.task_id == '69'
       assert task.task_position == 42
 
+@pytest.mark.asyncio
+async def test_submit_task_with_invalid_service(task_service):
+     task = TaskRequest(body = {}, callback=None)
+     with pytest.raises(ServiceNotFound):
+        await task_service.submit_task(task,"invalid_svc","bob")
+
+@pytest.mark.asyncio
+async def test_submit_task_with_invalid_client_authorization(task_service):
+    task = TaskRequest(body = {}, callback=None)
+    with pytest.raises(Forbidden):
+        await task_service.submit_task(task,"svc_no_schema","bob")
+
+@pytest.mark.asyncio
+async def test_submit_task_with_service_quota_ko(task_service):
+    task = TaskRequest(body = {}, callback=None)
+    async def count_pending_tasks_for_service(service) -> int:
+        return 10
+    task_service.task_repository.count_pending_tasks_for_service = count_pending_tasks_for_service
+
+    with pytest.raises(TooManyRequests):
+        await task_service.submit_task(task,"svc_quota_10","client_with_auth_and_no_quota")
+
+@pytest.mark.asyncio
+async def test_submit_task_with_user_quota_ko(task_service):
+    task = TaskRequest(body = {}, callback=None)
+
+    async def count_pending_tasks_for_service(service) -> int:
+        return 9
+    task_service.task_repository.count_pending_tasks_for_service = count_pending_tasks_for_service
+
+    async def count_pending_tasks_for_service_and_client(service, client_id) -> int:
+        return 11
+    task_service.task_repository.count_pending_tasks_for_service_and_client = count_pending_tasks_for_service_and_client
+
+    with pytest.raises(TooManyClientsRequests):
+        await task_service.submit_task(task,"svc_quota_10","client_with_auth_and_quota_10")
+
+@pytest.mark.asyncio
+async def test_submit_task_with_user_quota_ok(task_service):
+    task = TaskRequest(body = {}, callback=None)
+
+    async def count_pending_tasks_for_service(service) -> int:
+        return 9
+    task_service.task_repository.count_pending_tasks_for_service = count_pending_tasks_for_service
+
+    async def count_pending_tasks_for_service_and_client(service, client_id) -> int:
+        return 9
+    task_service.task_repository.count_pending_tasks_for_service_and_client = count_pending_tasks_for_service_and_client
+
+    task_data = await task_service.submit_task(task,"svc_quota_10","client_with_auth_and_quota_10")
+    assert task_data.task_position == 42

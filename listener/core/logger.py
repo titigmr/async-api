@@ -4,8 +4,11 @@ import sys
 
 class AsyncTaskFormatter(logging.Formatter):
     def format(self, record):
-        current_task = asyncio.current_task()
-        record.task_name = current_task.get_name() if current_task else "no-task"
+        try:
+            current_task = asyncio.current_task()
+            record.task_name = current_task.get_name() if current_task else "none"
+        except:
+            record.task_name = "none"    
         return super().format(record)
 
 def get_logger(name: str = "listener") -> logging.Logger:

@@ -15,11 +15,11 @@ from listener.services.queue_listener import QueueListener
 
 class DIContainer:
 
-    def __init__(self):
+    def __init__(self, settings: Settings):
         # Singletons
 
         # Loading setting
-        self.settings = Settings()
+        self.settings = settings
     
         # Setup log level
         logger.setLevel(self.settings.LISTENER_LOG_LEVEL)
