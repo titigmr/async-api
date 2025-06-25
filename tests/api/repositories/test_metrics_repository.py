@@ -1,0 +1,69 @@
+import uuid
+import pytest
+from api.repositories.metrics_repository import MetricsTaskRepository
+from api.repositories.task_repository import TaskRepository
+from api.schemas.enum import TaskStatus
+from api.schemas.task import TaskInfo
+from tests.utils.session_fixture import async_db_session
+
+@pytest.mark.asyncio
+async def test_count_tasks_per_status_and_service(async_db_session):
+    dataset: dict[str,dict[str,int]] = {
+        "svc1": {
+            TaskStatus.PENDING: 5,
+            TaskStatus.RUNNING: 4,
+            TaskStatus.SUCCESS: 3,
+            TaskStatus.FAILURE: 2,
+        },
+        "svc2": {
+            TaskStatus.PENDING: 2,
+            TaskStatus.RUNNING: 3,
+            TaskStatus.SUCCESS: 4,
+            TaskStatus.FAILURE: 5,
+        },
+    }
+    await create_dataset(async_db_session, dataset)
+    repo = MetricsTaskRepository(async_db_session)
+    results = await repo.count_tasks_per_status_and_service()
+
+    for result in results:
+        expected_count = dataset[result.service][result.status]
+        assert expected_count == result.count
+
+@pytest.mark.asyncio
+async def test_running_and_pending_tasks(async_db_session):
+    dataset: dict[str,dict[str,int]] = {
+        "svc1": {
+            TaskStatus.PENDING: 5,
+            TaskStatus.RUNNING: 4,
+            TaskStatus.SUCCESS: 3,
+            TaskStatus.FAILURE: 2,
+        },
+        "svc2": {
+            TaskStatus.PENDING: 20,
+            TaskStatus.RUNNING: 3,
+            TaskStatus.SUCCESS: 4,
+            TaskStatus.FAILURE: 5,
+        },
+    }
+    await create_dataset(async_db_session, dataset)
+    repo = MetricsTaskRepository(async_db_session)
+    results = await repo.running_and_pending_tasks()
+    assert len(results) == dataset["svc1"][TaskStatus.PENDING] + dataset["svc1"][TaskStatus.RUNNING] + dataset["svc2"][TaskStatus.PENDING] + dataset["svc2"][TaskStatus.RUNNING]
+
+async def create_dataset(async_session, dataset):
+    repo = TaskRepository(async_session)
+
+    for svc_name ,statuses in dataset.items():
+        for status, count in statuses.items():
+            for i in range(0,count):
+                task= TaskInfo (
+                    task_id = str(uuid.uuid4()), 
+                    client_id = "client", 
+                    service = svc_name, 
+                    status = status, 
+                    request = {}, 
+                    callback = None
+                )       
+                await repo.create_task_record(task)
+

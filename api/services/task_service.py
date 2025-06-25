@@ -60,7 +60,7 @@ class TaskService:
         if client_authorization is None:
             raise Forbidden
 
-        task_info: Row[Tuple[Task]] | None = await self.task_repository.get_task_by_id(
+        task_info: Task | None = await self.task_repository.get_task_by_id(
             task_id=task_id, service=service
         )
         if task_info:
