@@ -1,53 +1,11 @@
-import os
-import unittest
-import uuid
-
 import pytest
-import pytest_asyncio
-from sqlalchemy import create_engine
 
-
-from api.core.database import AsyncSessionLocal, Base
 from api.repositories.task_repository import TaskRepository
 from api.schemas.enum import TaskStatus
 from api.schemas.task import TaskInfo
 
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
-from sqlalchemy.orm import declarative_base
+from tests.utils.session_fixture import async_db_session
 
-
-
-
-@pytest_asyncio.fixture(scope="function", autouse=True)
-async def async_db_session():
-    async_engine = create_async_engine(
-    "sqlite+aiosqlite:///demo.db", echo=True
-    )
-
-    TestingAsyncSessionLocal = async_sessionmaker(
-        async_engine,
-        expire_on_commit=False,
-        autoflush=False,
-        autocommit=False,
-        class_=AsyncSession,
-    )
-    Base.metadata.create_all(bind=create_engine(f"sqlite:///demo.db", echo=True))
-    connection = await async_engine.connect()
-    trans = await connection.begin()
-    async_session = TestingAsyncSessionLocal(bind=connection)
-
-    yield async_session
-
-    if trans.is_valid:
-        await trans.rollback()
-    await async_session.close()
-    await connection.close()
-    os.remove("demo.db")
 
 @pytest.mark.asyncio
 async def test_should_create_new_task(async_db_session):

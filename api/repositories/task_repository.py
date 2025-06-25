@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
 from api.models import Task
-from api.schemas import TaskInfo
+from api.schemas.task import TaskInfo
 from api.schemas.enum import TaskStatus
 
 

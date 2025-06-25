@@ -39,9 +39,13 @@ source = [
 command_line = "-m pytest --junitxml=junit.xml"
 omit = [
     "tests/*",
+    "__init__.py"
 ]
 
 [tool.coverage.report]
-skip_covered = true
+exclude_also = [
+    'def __repr__',
+]
+skip_covered = false
 precision = 2
 sort = "-miss"
