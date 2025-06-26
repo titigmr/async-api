@@ -60,7 +60,6 @@ services:
       POSTGRES_DB: tasks
     ports:
       - "5432:5432"
-
   broker:
     image: rabbitmq:management
     container_name: rabbitmq

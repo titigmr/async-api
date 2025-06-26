@@ -46,7 +46,7 @@ class MessageSender {
             task_id: task_id,
             data: {
                 message_type: "started",
-                hostName: os.hostname()
+                hostname: os.hostname()
             }
         }) 
     }
@@ -66,7 +66,7 @@ class MessageSender {
             task_id: task_id,
             data: {
                 message_type: "failure",
-                errorMessage: cause
+                error_message: cause
             }
         }) 
     }

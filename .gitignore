@@ -5,4 +5,5 @@
 __pycache__
 docs/
 htmlcov/
+nodemodules/
 junit.xml

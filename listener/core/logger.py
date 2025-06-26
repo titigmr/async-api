@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 
+
 class AsyncTaskFormatter(logging.Formatter):
     def format(self, record):
         try:
@@ -10,6 +11,7 @@ class AsyncTaskFormatter(logging.Formatter):
         except:
             record.task_name = "none"    
         return super().format(record)
+
 
 def get_logger(name: str = "listener") -> logging.Logger:
     logger = logging.getLogger(name)
@@ -21,7 +23,8 @@ def get_logger(name: str = "listener") -> logging.Logger:
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        logger.setLevel("INFO")
+        logger.setLevel("DEBUG")
     return logger
- 
+
+
 logger: logging.Logger = get_logger()

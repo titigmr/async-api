@@ -1,21 +1,23 @@
 import asyncio
-from contextvars import Context
 import signal
-from aio_pika.abc import AbstractIncomingMessage
+from contextvars import Context
 
 import aio_pika
+from aio_pika.abc import AbstractIncomingMessage
 
 from api.repositories.services_config_repository import ServicesConfigRepository
 from listener.core.logger import logger
 from listener.services.message_service import MessageService, MessageServiceError
 
-class QueueListener:
 
-    def __init__(self, 
-                 message_service: MessageService,
-                 service_repository: ServicesConfigRepository, 
-                 rabbitmq_url: str,
-                 concurrency: int = 20):
+class QueueListener:
+    def __init__(
+        self,
+        message_service: MessageService,
+        service_repository: ServicesConfigRepository,
+        rabbitmq_url: str,
+        concurrency: int = 20,
+    ):
         self.service_repository = service_repository
         self.rabbit_url = rabbitmq_url
         self.message_service = message_service
@@ -25,18 +27,21 @@ class QueueListener:
         self.stop_event = asyncio.Event()
         pass
 
-    async def process_message(self,message: AbstractIncomingMessage,service_name: str):
-        async with message.process(): 
-            try: # auto-ack à la fin du bloc
+    async def process_message(self, message: AbstractIncomingMessage, service_name: str):
+        async with message.process():
+            try:  # auto-ack à la fin du bloc
                 await self.message_service.process(message.body.decode(), service_name=service_name)
             except MessageServiceError as e:
                 logger.error(f"Error: {e}")
 
-    def message_handler(self,service_name: str):
+    def message_handler(self, service_name: str):
         async def inner_message_handler(message: AbstractIncomingMessage):
             # Non blocking message processing (another task is created)
-            task = asyncio.create_task(self.process_message(message=message,service_name=service_name),context=Context())
+            task = asyncio.create_task(
+                self.process_message(message=message, service_name=service_name), context=Context()
+            )
             self.consumer_task.append(task)
+
         return inner_message_handler
 
     async def wait_for_connection(self) -> aio_pika.RobustConnection:
@@ -45,13 +50,12 @@ class QueueListener:
                 logger.info("Connecting to rabbitmq...")
                 connection = await aio_pika.connect_robust(self.rabbit_url)
                 logger.info("Successfully connected.")
-                return connection # type: ignore
+                return connection  # type: ignore
             except Exception as e:
                 logger.error(f"Connection failure : {e}. Retry in 5s...")
                 await asyncio.sleep(5)
 
     async def start(self):
-
         logger.info("----------------------------")
         logger.info(f"⏳ Connecting to the output queues (concurrency: {self.concurrency})...")
         connection = await self.wait_for_connection()
@@ -69,7 +73,7 @@ class QueueListener:
         loop = asyncio.get_running_loop()
         loop.add_signal_handler(signal.SIGINT, self.stop)
         loop.add_signal_handler(signal.SIGTERM, self.stop)
-        
+
         # Wait for a stop signal
         await self.stop_event.wait()
         logger.info("💥 Stop signal received, closing connection.")
@@ -80,6 +84,3 @@ class QueueListener:
 
     def stop(self):
         self.stop_event.set()
-  
-
-
