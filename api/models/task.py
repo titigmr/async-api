@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import JSON, Column, DateTime, Float, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from api.core.database import Base
@@ -12,7 +13,7 @@ class Task(Base):
     task_id = Column(String, unique=True, nullable=False, index=True)
     client_id = Column(String, nullable=False)
     service = Column(String, nullable=False)
-    status = Column(String, default="pending", nullable=False)
+    status: Mapped[str] = mapped_column(String, default="pending", nullable=False)
     request = Column(JSON, nullable=False)
     error_message = Column(String, nullable=True)
     progress = Column(Float, default=0.0, nullable=False)

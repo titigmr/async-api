@@ -107,7 +107,7 @@ class MessageService:
         if task is None:
             raise MessageServiceError(f"Task not found, task_id: '{task_id}', service_name: '{service_name}'")
 
-        task.status = TaskStatus.RUNNING            # type: ignore
+        task.status = TaskStatus.RUNNING           
         task.start_date = datetime.datetime.now()   # type: ignore
         task.worker_host = data.hostname            # type: ignore
         task.progress = 0.0                         # type: ignore
