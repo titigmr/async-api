@@ -8,8 +8,8 @@ class AsyncTaskFormatter(logging.Formatter):
         try:
             current_task = asyncio.current_task()
             record.task_name = current_task.get_name() if current_task else "none"
-        except:
-            record.task_name = "none"    
+        except Exception:
+            record.task_name = "none"
         return super().format(record)
 
 

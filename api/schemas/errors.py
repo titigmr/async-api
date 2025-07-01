@@ -11,16 +11,14 @@ class ErrorDetail(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    status: str = Field(
-        default="error", description="Statut de la réponse (toujours 'error')"
-    )
+    status: str = Field(default="error", description="Statut de la réponse (toujours 'error')")
     error: ErrorDetail = Field(default=..., description="Détails de l'erreur")
 
 
 class AppException(Exception):
     status_code: int = 500
     number: int = 500000
-    description: str = "Internal server error"
+    description: str = ""
 
     def __init__(self, details: str | None = None) -> None:
         self.details: str | None = details
@@ -70,6 +68,7 @@ class TooManyClientsRequests(AppException):
     status_code = 429
     number = 429002
     description = "Too many service requests for the clientId."
+
 
 class Unauthorized(AppException):
     status_code = 401

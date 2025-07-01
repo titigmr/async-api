@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.core.config import Settings, settings
+from api.core.config import Settings
 from api.repositories.services_config_repository import ServicesConfigRepository
 from api.repositories.task_repository import TaskRepository
 from listener.core.logger import logger
@@ -13,13 +13,12 @@ from listener.services.queue_listener import QueueListener
 
 
 class DIContainer:
-
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings) -> None:
         # Singletons
 
         # Loading setting
         self.settings = settings
-    
+
         # Setup log level
         logger.setLevel(self.settings.LISTENER_LOG_LEVEL)
 
@@ -45,10 +44,12 @@ class DIContainer:
         return AmqpNotifier(self.settings.LISTENER_NOTIFIER_RETRY)
 
     def notification_service(self):
-        return NotificationService([
-            self.http_notifier(),
-            self.amqp_notifier(),
-        ])
+        return NotificationService(
+            [
+                self.http_notifier(),
+                self.amqp_notifier(),
+            ],
+        )
 
     def message_service(self):
         return MessageService(self.task_repository(), self.notification_service(), self.session())

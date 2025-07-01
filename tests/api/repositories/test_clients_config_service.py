@@ -3,24 +3,25 @@ import os
 import pytest
 
 from api.repositories.client_config_repository import ClientConfigRepository, ClientsConfigException
-from api.repositories.services_config_repository import ServicesConfigException
 
 
-def test_initialization_non_existant_file():
+def test_initialization_non_existant_file() -> None:
     with pytest.raises(ClientsConfigException):
         ClientConfigRepository.load_clients_config(client_file="non_existent_file.yaml")
 
-def test_initialization_bad_yaml_file():
+
+def test_initialization_bad_yaml_file() -> None:
     with pytest.raises(ClientsConfigException):
         ClientConfigRepository.load_clients_config(client_file="./tests/resources/bad_yaml.yaml")
-        
-def test_all_clients():
+
+
+def test_all_clients() -> None:
     # Singleton registration (read config at startup)
     os.environ["CLIENT_SECRET_1"] = "bobs_secret"
     ClientConfigRepository.load_clients_config("./tests/resources/clients.yaml")
     client_config_repository = ClientConfigRepository()
     clients = client_config_repository.all_clients()
-    
+
     assert len(clients) == 2
     assert "client1" in clients
     assert clients["client1"].client_id == "client1"
@@ -33,10 +34,10 @@ def test_all_clients():
     assert clients["client2"].client_secret is None
     assert len(clients["client2"].authorizations) == 0
 
-def test_all_clients_without_env_secret():
+
+def test_all_clients_without_env_secret() -> None:
     # Assume the environment variable is not set
     del os.environ["CLIENT_SECRET_1"]
     # Test with a non-existing service
     with pytest.raises(ClientsConfigException):
         ClientConfigRepository.load_clients_config("./tests/resources/clients.yaml")
-

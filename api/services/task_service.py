@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends
 from jsonschema import validate
@@ -18,6 +18,9 @@ from api.schemas.errors import BodyValidationError, Forbidden, ServiceNotFound, 
 from api.services import QueueSender, ServiceService
 from api.services.client_service import ClientService
 
+if TYPE_CHECKING:
+    from api.models import Task
+
 
 class TaskService:
     def __init__(
@@ -33,8 +36,7 @@ class TaskService:
         self.queue_sender: QueueSender = queue_sender
 
     def check_service_schema(self, service: str, body: dict) -> None:
-        """
-        Vérifie que le body est conforme au json_schema du service (si défini).
+        """Vérifie que le body est conforme au json_schema du service (si défini).
         Lève BodyValidationError si la validation échoue.
         """
         service_obj: ServiceInfo | None = self.service_service.get_service(service)
@@ -44,39 +46,40 @@ class TaskService:
                 validate(instance=body, schema=service_obj.json_schema)
             except Exception as e:
                 raise BodyValidationError(
-                    details=f"Erreur de validation du body avec le json-schema du service '{service_obj.name}': {e}"
+                    details=f"Erreur de validation du body avec le json-schema du service '{service_obj.name}': {e}",
                 )
 
     async def poll_task(self, task_id: str, service: str, client_id: str) -> TaskData | None:
-        """Poll a task by its ID"""
+        """Poll a task by its ID."""
         # Check service exits
         if not self.service_service.get_service(service_name=service):
             raise ServiceNotFound
 
         # Check client authorization on service
         client_authorization = self.client_service.get_client_authorization_for_service(
-            client_id=client_id, service=service
+            client_id=client_id, service=service,
         )
         if client_authorization is None:
             raise Forbidden
 
-        task_info: Task | None = await self.task_repository.get_task_by_id(
-            task_id=task_id, service=service
-        )
+        task_info: Task | None = await self.task_repository.get_task_by_id(task_id=task_id, service=service)
         if task_info:
             task_position: int | None = await self.task_repository.get_task_position_by_id(
-                task_id=str(task_info.task_id), service=service
+                task_id=str(task_info.task_id), service=service,
             )
-            print(f"Type submission date: {type(task_info.submition_date)}, date: {task_info.submition_date}")
+
             return TaskData(
                 task_id=task_info.task_id,
                 task_position=task_position,
                 submission_date=task_info.submition_date,
+                progress=task_info.progress,
+                result=task_info.response,
                 status=TaskStatus(value=task_info.status),
             )
+        return None
 
     async def submit_task(self, task: TaskRequest, service: str, client_id: str) -> TaskData:
-        """Submit a new task"""
+        """Submit a new task."""
         # Check service exits
         service_info = self.service_service.get_service(service_name=service)
         if service_info is None:
@@ -84,7 +87,7 @@ class TaskService:
 
         # Check client authorization on service
         client_authorization = self.client_service.get_client_authorization_for_service(
-            client_id=client_id, service=service
+            client_id=client_id, service=service,
         )
         if client_authorization is None:
             raise Forbidden
@@ -97,14 +100,13 @@ class TaskService:
 
         # Check quotas (client/service)
         client_quotas_for_service = client_authorization.quotas
-        if client_quotas_for_service is not None:
-            if (
-                await self.task_repository.count_pending_tasks_for_service_and_client(
-                    service=service, client_id=client_id
-                )
-                >= client_quotas_for_service
-            ):
-                raise TooManyClientsRequests
+        if client_quotas_for_service is not None and (
+            await self.task_repository.count_pending_tasks_for_service_and_client(
+                service=service, client_id=client_id,
+            )
+            >= client_quotas_for_service
+        ):
+            raise TooManyClientsRequests
 
         # Check schema
         self.check_service_schema(service=service, body=task.body)
@@ -112,7 +114,7 @@ class TaskService:
         task_id = str(uuid.uuid4())
         queue_message = QueueTask(task_id=task_id, data=QueueData(message_type="submission", body=task.body))
         await self.queue_sender.send_task_to_queue(
-            queue=service_info.in_queue, task_data=queue_message, service=service
+            queue=service_info.in_queue, task_data=queue_message, service=service,
         )
 
         task_obj = TaskInfo(

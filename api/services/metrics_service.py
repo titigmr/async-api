@@ -15,6 +15,7 @@ H: float = 60.0 * MN
 
 
 class MetricsService:
+
     """Service for managing Prometheus metrics related to tasks.
     This service provides methods to update custom metrics for tasks, including
     pending, running, success, and failure counts, as well as latency histograms.
@@ -22,18 +23,10 @@ class MetricsService:
     """
 
     # Custom metrics
-    TASKS_PENDING_COUNT = Gauge(
-        "tasks_pending_count", "Tasks pending count", ["service"]
-    )
-    TASKS_IN_PROGRESS_COUNT = Gauge(
-        "tasks_in_progress_count", "Tasks in_progress count", ["service"]
-    )
-    TASKS_SUCCESS_COUNT = Gauge(
-        "tasks_success_count", "Tasks success count", ["service"]
-    )
-    TASKS_FAILURE_COUNT = Gauge(
-        "tasks_failure_count", "Tasks failurecount", ["service"]
-    )
+    TASKS_PENDING_COUNT = Gauge("tasks_pending_count", "Tasks pending count", ["service"])
+    TASKS_IN_PROGRESS_COUNT = Gauge("tasks_in_progress_count", "Tasks in_progress count", ["service"])
+    TASKS_SUCCESS_COUNT = Gauge("tasks_success_count", "Tasks success count", ["service"])
+    TASKS_FAILURE_COUNT = Gauge("tasks_failure_count", "Tasks failurecount", ["service"])
 
     TASKS_LATENCY_BUCKETS = (
         5.0 * S,
@@ -61,13 +54,11 @@ class MetricsService:
 
     def __init__(
         self,
-        metrics_repository: Annotated[
-            MetricsTaskRepository, Depends(MetricsTaskRepository)
-        ],
-    ):
+        metrics_repository: Annotated[MetricsTaskRepository, Depends(MetricsTaskRepository)],
+    ) -> None:
         self.taskRepo = metrics_repository
 
-    async def update_custom_metrics(self):
+    async def update_custom_metrics(self) -> None:
         latency_result = await self.taskRepo.running_and_pending_tasks()
         now = datetime.now()
         self.TASKS_LATENCY_RUNNING.clear()
@@ -75,28 +66,20 @@ class MetricsService:
         for metric in latency_result:
             if metric.status == TaskStatus.PENDING and metric.submition_date:
                 self.TASKS_LATENCY_PENDING.labels(service=metric.service).observe(
-                    (now - metric.submition_date).total_seconds()
+                    (now - metric.submition_date).total_seconds(),
                 )
             elif metric.status == TaskStatus.RUNNING and metric.start_date:
                 self.TASKS_LATENCY_RUNNING.labels(service=metric.service).observe(
-                    (now - metric.start_date).total_seconds()
+                    (now - metric.start_date).total_seconds(),
                 )
 
         count_result = await self.taskRepo.count_tasks_per_status_and_service()
         for metric in count_result:
             if metric.status == TaskStatus.PENDING:
-                self.TASKS_PENDING_COUNT.labels(service=metric.service).set(
-                    metric.count
-                )
+                self.TASKS_PENDING_COUNT.labels(service=metric.service).set(metric.count)
             elif metric.status == TaskStatus.RUNNING:
-                self.TASKS_IN_PROGRESS_COUNT.labels(service=metric.service).set(
-                    metric.count
-                )
+                self.TASKS_IN_PROGRESS_COUNT.labels(service=metric.service).set(metric.count)
             elif metric.status == TaskStatus.SUCCESS:
-                self.TASKS_SUCCESS_COUNT.labels(service=metric.service).set(
-                    metric.count
-                )
+                self.TASKS_SUCCESS_COUNT.labels(service=metric.service).set(metric.count)
             elif metric.status == TaskStatus.FAILURE:
-                self.TASKS_FAILURE_COUNT.labels(service=metric.service).set(
-                    metric.count
-                )
+                self.TASKS_FAILURE_COUNT.labels(service=metric.service).set(metric.count)

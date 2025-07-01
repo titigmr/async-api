@@ -12,16 +12,13 @@ from api.services.queue_service import QueueSender
 router = APIRouter()
 
 
-@router.get(
-    path="/health", response_model=HealthResponse, summary="Vérifie la santé de l'API"
-)
+@router.get(path="/health", summary="Vérifie la santé de l'API")
 def health() -> HealthResponse:
     return HealthResponse(status="ok")
 
 
 @router.get(
     path="/readiness",
-    response_model=ReadyResponse,
     summary="Vérifie si les dépendances sont prêtes et que l'API est prête à recevoir du trafic",
 )
 async def readiness(
@@ -50,9 +47,7 @@ async def readiness(
         broker_details = str(error)
     components["broker"] = ReadyComponent(status=broker_status, details=broker_details)
 
-    global_status: Literal["ok"] | Literal["error"] = (
-        "ok"
-        if all(component.status == "ok" for component in components.values())
-        else "error"
+    global_status: Literal["ok", "error"] = (
+        "ok" if all(component.status == "ok" for component in components.values()) else "error"
     )
     return ReadyResponse(status=global_status, components=components)

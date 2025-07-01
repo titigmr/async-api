@@ -1,13 +1,11 @@
-from typing import Any, Dict
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
 class QueueData(BaseModel):
-    message_type: str = Field(
-        default=..., description="Type du message (ex: submission)"
-    )
-    body: Dict[str, Any] = Field(default=..., description="Payload de la tâche")
+    message_type: str = Field(default=..., description="Type du message (ex: submission)")
+    body: dict[str, Any] = Field(default=..., description="Payload de la tâche")
 
 
 class QueueTask(BaseModel):

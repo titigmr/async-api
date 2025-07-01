@@ -1,8 +1,10 @@
 import asyncio
+
 import aio_pika
+
 from api.core.config import settings
-from api.schemas import QueueTask
 from api.core.utils import logger
+from api.schemas import QueueTask
 
 
 class QueueSenderError(Exception):
@@ -10,21 +12,21 @@ class QueueSenderError(Exception):
 
 
 class QueueSender:
-    def __init__(self):
+    def __init__(self) -> None:
         self.broker_url = settings.BROKER_URL
         self.max_retries = settings.API_SENDER_RETRY
-        pass
 
-    async def ping(self):
+    async def ping(self) -> None:
         connection = await aio_pika.connect_robust(self.broker_url)
         if connection.is_closed:
-            raise QueueSenderError("Not connected")
+            msg = "Not connected"
+            raise QueueSenderError(msg)
         await connection.close()
 
-    async def send_task_to_queue(self, queue: str, task_data: QueueTask, service: str):
+    async def send_task_to_queue(self, queue: str, task_data: QueueTask, service: str) -> None:
         await self.send_task_to_queue_retry(queue, task_data, service, 0)
 
-    async def send_task_to_queue_retry(self, queue: str, task_data: QueueTask, service: str, retry: int):
+    async def send_task_to_queue_retry(self, queue: str, task_data: QueueTask, service: str, retry: int) -> None:
         try:
             connection = await aio_pika.connect_robust(self.broker_url)
             async with connection:
@@ -42,4 +44,5 @@ class QueueSender:
                 await self.send_task_to_queue_retry(queue, task_data, service, retry + 1)
                 return
             logger.debug("No more retries")
-            raise QueueSenderError(f"Error sending task: {task_data}", e)
+            msg = f"Error sending task: {task_data}"
+            raise QueueSenderError(msg, e)

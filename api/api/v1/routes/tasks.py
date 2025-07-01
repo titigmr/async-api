@@ -25,11 +25,8 @@ logger: logging.Logger = logging.getLogger(name="uvicorn.error")
 
 
 @callback_router.post(path="{$callback.url}")
-def receive_callback(body: TaskCallback) -> None:  # noqa
-    """
-    Exemple d'endpoint pour recevoir le callback d'une tâche asynchrone.
-    """
-    pass
+def receive_callback(body: TaskCallback) -> None:
+    """Exemple d'endpoint pour recevoir le callback d'une tâche asynchrone."""
 
 
 @router.post(
@@ -74,9 +71,7 @@ async def create_task(
     task_service: Annotated[TaskService, Depends(TaskService)],
     client_id: Annotated[str, Depends(auth_guard)],
 ):
-    """
-    Crée une tâche pour le service demandé.
-    """
+    """Crée une tâche pour le service demandé."""
     task_data: TaskData = await task_service.submit_task(task=task, service=service, client_id=client_id)
     return TaskResponse(status=TaskStatus.SUCCESS, data=task_data)
 
@@ -116,9 +111,8 @@ async def get_task(
     task_service: Annotated[TaskService, Depends(TaskService)],
     client_id: Annotated[str, Depends(auth_guard)],
 ) -> TaskResponse | JSONResponse:
-    """
-    Récupère le statut d'une tâche via son identifiant.
-    - **task_id** : identifiant unique de la tâche
+    """Récupère le statut d'une tâche via son identifiant.
+    - **task_id** : identifiant unique de la tâche.
     """
     task_info: TaskData | None = await task_service.poll_task(task_id=task_id, service=service, client_id=client_id)
     if not task_info:
