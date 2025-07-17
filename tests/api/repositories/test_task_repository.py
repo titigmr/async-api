@@ -56,7 +56,7 @@ async def test_get_task_position_by_id(async_db_session) -> None:
         task_id="test_task_run",
         client_id="test_task_run",
         service="svc",
-        status=TaskStatus.RUNNING,
+        status=TaskStatus.IN_PROGRESS,
         request={},
         callback=None,
     )
@@ -64,7 +64,7 @@ async def test_get_task_position_by_id(async_db_session) -> None:
     for i in range(3):
         task_info = TaskInfo(
             task_id=f"test_task{i}",
-            client_id="test_task{i}",
+            client_id=f"test_task{i}",
             service="svc",
             status=TaskStatus.PENDING,
             request={},
@@ -107,7 +107,7 @@ async def test_count_pending_tasks_for_service(async_db_session) -> None:
         task_id="test_task_running",
         client_id="test_task_running",
         service="svc",
-        status=TaskStatus.RUNNING,
+        status=TaskStatus.IN_PROGRESS,
         request={},
         callback=None,
     )
@@ -117,7 +117,7 @@ async def test_count_pending_tasks_for_service(async_db_session) -> None:
         task_id="test_task_task_other",
         client_id="test_task_running",
         service="task_other",
-        status=TaskStatus.RUNNING,
+        status=TaskStatus.IN_PROGRESS,
         request={},
         callback=None,
     )
@@ -157,7 +157,7 @@ async def test_count_pending_tasks_for_service_and_client(async_db_session) -> N
         task_id="test_task_running",
         client_id="client",
         service="svc",
-        status=TaskStatus.RUNNING,
+        status=TaskStatus.IN_PROGRESS,
         request={},
         callback=None,
     )
@@ -167,7 +167,7 @@ async def test_count_pending_tasks_for_service_and_client(async_db_session) -> N
         task_id="client_other_svc",
         client_id="client",
         service="task_other",
-        status=TaskStatus.RUNNING,
+        status=TaskStatus.IN_PROGRESS,
         request={},
         callback=None,
     )

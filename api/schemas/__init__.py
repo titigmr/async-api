@@ -4,7 +4,10 @@ from .service import ServiceInfo
 from .status import HealthResponse, ReadyComponent, ReadyResponse
 from .task import (
     Callback,
-    TaskData,
+    TaskDataFailed,
+    TaskDataPending,
+    TaskDataProgress,
+    TaskDataSuccess,
     TaskErrorResponse,
     TaskInfo,
     TaskRequest,
@@ -20,7 +23,10 @@ __all__ = [
     "ReadyResponse",
     "ServiceInfo",
     "TaskCallback",
-    "TaskData",
+    "TaskDataFailed",
+    "TaskDataPending",
+    "TaskDataProgress",
+    "TaskDataSuccess",
     "TaskErrorResponse",
     "TaskInfo",
     "TaskInfo",

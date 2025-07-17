@@ -23,7 +23,6 @@ class TaskRepository:
             # await self.db.execute(text("SELECT pg_sleep(1);"))
             return task
         except Exception:
-            await self.db.rollback()
             raise
 
     async def get_task_by_id(self, task_id: str, service: str) -> Task | None:

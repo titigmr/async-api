@@ -20,16 +20,40 @@ class TaskInfo(BaseModel):
     callback: Callback | None = None
 
 
-class TaskData(BaseModel):
+class TaskDataPending(BaseModel):
     task_id: str = Field(default=..., description="Identifiant unique de la tâche")
-    status: TaskStatus = Field(
-        default=TaskStatus.PENDING,
-        description="Statut actuel de la tâche (pending, in_progress, success, failure, etc.)",
-    )
-    result: Any | None = Field(default=None, description="Résultat de la tâche")
-    progress: float | None = Field(default=None, description="Progression de la tâche (0.0 à 1.0)")
+    status: TaskStatus = TaskStatus.PENDING
     task_position: int | None = Field(default=None, description="Position de la tâche dans la file d'attente")
     submission_date: datetime | None = Field(default=None, description="Date de soumission de la tâche")
+
+
+class TaskDataProgress(BaseModel):
+    task_id: str = Field(default=..., description="Identifiant unique de la tâche")
+    status: TaskStatus = TaskStatus.IN_PROGRESS
+    progress: float | None = Field(default=None, description="Progression de la tâche (0.0 à 1.0)")
+    submission_date: datetime | None = Field(default=None, description="Date de soumission de la tâche")
+    start_date: datetime | None = Field(default=None, description="Date de début de la tâche")
+
+
+class TaskDataFailed(BaseModel):
+    task_id: str = Field(default=..., description="Identifiant unique de la tâche")
+    status: TaskStatus = TaskStatus.FAILURE
+    error_message: str | None = Field(
+        default=...,
+        description="Message d'erreur associé à la tâche",
+    )
+    submission_date: datetime | None = Field(default=None, description="Date de soumission de la tâche")
+    start_date: datetime | None = Field(default=None, description="Date de début de la tâche")
+    end_date: datetime | None = Field(default=None, description="Date de fin de la tâche")
+
+
+class TaskDataSuccess(BaseModel):
+    task_id: str = Field(default=..., description="Identifiant unique de la tâche")
+    status: TaskStatus = TaskStatus.SUCCESS
+    result: Any | None = Field(default=None, description="Résultat de la tâche")
+    submission_date: datetime | None = Field(default=None, description="Date de soumission de la tâche")
+    start_date: datetime | None = Field(default=None, description="Date de début de la tâche")
+    end_date: datetime | None = Field(default=None, description="Date de fin de la tâche")
 
 
 class TaskRequest(BaseModel):
@@ -38,7 +62,10 @@ class TaskRequest(BaseModel):
 
 
 class TaskResponse(BaseModel):
-    data: TaskData = Field(default=..., description="Données de la tâche créée")
+    data: TaskDataSuccess | TaskDataFailed | TaskDataPending | TaskDataProgress = Field(
+        default=...,
+        description="Données de la tâche",
+    )
     status: TaskStatus = Field(default=TaskStatus.SUCCESS, description="Statut de la création de la tâche")
 
 

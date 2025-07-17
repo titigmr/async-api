@@ -3,12 +3,14 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, status
-from starlette.responses import JSONResponse
 
 from api.core.security import auth_guard
 from api.schemas import (
     TaskCallback,
-    TaskData,
+    TaskDataFailed,
+    TaskDataPending,
+    TaskDataProgress,
+    TaskDataSuccess,
     TaskErrorResponse,
     TaskRequest,
     TaskResponse,
@@ -33,7 +35,6 @@ def receive_callback(body: TaskCallback) -> None:
     path="/services/{service}/tasks",
     status_code=status.HTTP_201_CREATED,
     callbacks=callback_router.routes,
-    response_model=TaskResponse,
     responses={
         404: {
             "model": TaskErrorResponse,
@@ -65,20 +66,21 @@ async def create_task(
         TaskRequest,
         Body(
             default=...,
-            description="Représente la tâche à créer. Inclut le nom du service, les paramètres, et éventuellement un callback.",
+            description=(
+                "Représente la tâche à créer. Inclut le nom du service, les paramètres, et éventuellement un callback."
+            ),
         ),
     ],
     task_service: Annotated[TaskService, Depends(TaskService)],
     client_id: Annotated[str, Depends(auth_guard)],
-):
+) -> TaskResponse:
     """Crée une tâche pour le service demandé."""
-    task_data: TaskData = await task_service.submit_task(task=task, service=service, client_id=client_id)
+    task_data: TaskDataPending = await task_service.submit_task(task=task, service=service, client_id=client_id)
     return TaskResponse(status=TaskStatus.SUCCESS, data=task_data)
 
 
 @router.get(
     path="/services/{service}/tasks/{task_id}",
-    response_model=TaskResponse,
     responses={
         404: {
             "model": TaskErrorResponse,
@@ -101,7 +103,9 @@ async def get_task(
         str,
         Path(
             default=...,
-            description="Nom du service pour lequel récupérer la tâche. Doit être dans la liste des services autorisés.",
+            description=(
+                "Nom du service pour lequel récupérer la tâche doit être dans la liste des services autorisés."
+            ),
         ),
     ],
     task_id: Annotated[
@@ -110,11 +114,13 @@ async def get_task(
     ],
     task_service: Annotated[TaskService, Depends(TaskService)],
     client_id: Annotated[str, Depends(auth_guard)],
-) -> TaskResponse | JSONResponse:
+) -> TaskResponse:
     """Récupère le statut d'une tâche via son identifiant.
     - **task_id** : identifiant unique de la tâche.
     """
-    task_info: TaskData | None = await task_service.poll_task(task_id=task_id, service=service, client_id=client_id)
+    task_info: (
+        TaskDataPending | TaskDataProgress | TaskDataFailed | TaskDataSuccess | TaskErrorResponse | None
+    ) = await task_service.poll_task(task_id=task_id, service=service, client_id=client_id)
     if not task_info:
         raise TaskNotFound
     return TaskResponse(status=TaskStatus.SUCCESS, data=task_info)

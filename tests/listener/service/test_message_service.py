@@ -91,7 +91,7 @@ async def test_process_start_message_task_ok(message_service) -> None:
     message_service.session.commit.assert_called()
     message_service.session.close.assert_called()
     task = await message_service.task_repository.get_task_by_id("task_found", "svc")
-    assert task.status == "running"
+    assert task.status == TaskStatus.IN_PROGRESS
     assert task.start_date is not None
     assert task.worker_host == "myhost"
     assert task.progress == 0

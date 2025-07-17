@@ -97,8 +97,8 @@ class MessageService:
 
             logger.debug("commit()")
             await self.session.commit()
-        except Exception:
-            logger.debug("rollback()")
+        except Exception as error:
+            logger.debug(f"Error: {error!s}, rollback()")
             await self.session.rollback()
             raise
         finally:
@@ -119,7 +119,7 @@ class MessageService:
             msg = f"Task not found, task_id: '{task_id}', service_name: '{service_name}'"
             raise MessageServiceError(msg)
 
-        task.status = TaskStatus.RUNNING
+        task.status = TaskStatus.IN_PROGRESS
         task.start_date = datetime.datetime.now()
         task.worker_host = data.hostname
         task.progress = 0.0
@@ -140,11 +140,12 @@ class MessageService:
             raise MessageServiceError(msg)
 
         task.status = TaskStatus.SUCCESS
-        task.end_date = datetime.datetime.now(tz=datetime.UTC)
+        task.progress = 100
+        task.end_date = datetime.datetime.now()
         task.response = json.dumps(data.response)
 
         callback_dict: dict = task.callback if task.callback is not None else {}
-        if callback_dict is not None:
+        if callback_dict:
             message = {
                 "task_id": task_id,
                 "status": "SUCCESS",
@@ -160,6 +161,7 @@ class MessageService:
             except Exception as e:
                 logger.error(f"Notification failure for task_id '{task_id}': {e}")
                 task.notification_status = "FAILURE"
+        task.notification_status = "SUCCESS"
 
     async def process_failure_message(self, task_id: str, service_name: str, data: FailureMessage) -> None:
         logger.debug("Handling failure message")

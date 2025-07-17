@@ -76,7 +76,7 @@ def task_service() -> TaskService:
     # TASK-REPO
     async def get_task_by_id(task_id: str, service: str) -> Task | None:
         if task_id == "valid_task":
-            return Task(status=TaskStatus.RUNNING, task_id="69", response=None)
+            return Task(status=TaskStatus.IN_PROGRESS, task_id="69", response=None)
         return None
 
     async def get_task_position_by_id(task_id: str, service: str) -> int | None:
@@ -140,9 +140,8 @@ async def test_pool_task_not_found(task_service) -> None:
 async def test_pool_task_ok(task_service) -> None:
     task = await task_service.poll_task("valid_task", "svc_no_schema", "client_with_auth_and_no_quota")
     assert task is not None
-    assert task.status == TaskStatus.RUNNING
+    assert task.status == TaskStatus.IN_PROGRESS
     assert task.task_id == "69"
-    assert task.task_position == 42
 
 
 @pytest.mark.asyncio

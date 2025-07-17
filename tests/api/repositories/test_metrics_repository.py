@@ -13,13 +13,13 @@ async def test_count_tasks_per_status_and_service(async_db_session) -> None:
     dataset: dict[str, dict[str, int]] = {
         "svc1": {
             TaskStatus.PENDING: 5,
-            TaskStatus.RUNNING: 4,
+            TaskStatus.IN_PROGRESS: 4,
             TaskStatus.SUCCESS: 3,
             TaskStatus.FAILURE: 2,
         },
         "svc2": {
             TaskStatus.PENDING: 2,
-            TaskStatus.RUNNING: 3,
+            TaskStatus.IN_PROGRESS: 3,
             TaskStatus.SUCCESS: 4,
             TaskStatus.FAILURE: 5,
         },
@@ -38,13 +38,13 @@ async def test_running_and_pending_tasks(async_db_session) -> None:
     dataset: dict[str, dict[str, int]] = {
         "svc1": {
             TaskStatus.PENDING: 5,
-            TaskStatus.RUNNING: 4,
+            TaskStatus.IN_PROGRESS: 4,
             TaskStatus.SUCCESS: 3,
             TaskStatus.FAILURE: 2,
         },
         "svc2": {
             TaskStatus.PENDING: 20,
-            TaskStatus.RUNNING: 3,
+            TaskStatus.IN_PROGRESS: 3,
             TaskStatus.SUCCESS: 4,
             TaskStatus.FAILURE: 5,
         },
@@ -55,9 +55,9 @@ async def test_running_and_pending_tasks(async_db_session) -> None:
     assert (
         len(results)
         == dataset["svc1"][TaskStatus.PENDING]
-        + dataset["svc1"][TaskStatus.RUNNING]
+        + dataset["svc1"][TaskStatus.IN_PROGRESS]
         + dataset["svc2"][TaskStatus.PENDING]
-        + dataset["svc2"][TaskStatus.RUNNING]
+        + dataset["svc2"][TaskStatus.IN_PROGRESS]
     )
 
 

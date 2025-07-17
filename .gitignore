@@ -7,3 +7,5 @@ docs/
 htmlcov/
 nodemodules/
 junit.xml
+.vscode
+.ruff_cache

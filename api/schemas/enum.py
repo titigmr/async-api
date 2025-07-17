@@ -2,7 +2,6 @@ from enum import Enum
 
 
 class ErrorEnum(str, Enum):
-
     """Error codes for the application."""
 
     TASK_NOT_FOUND = "Task not found"
@@ -11,10 +10,9 @@ class ErrorEnum(str, Enum):
 
 
 class TaskStatus(str, Enum):
-
     """Status codes for the application."""
 
     PENDING = "pending"
-    RUNNING = "running"
+    IN_PROGRESS = "in_progress"
     SUCCESS = "success"
     FAILURE = "failure"

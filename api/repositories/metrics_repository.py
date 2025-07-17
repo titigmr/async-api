@@ -28,7 +28,11 @@ class PendingAndRunningTaskView:
         self.start_date: datetime = start_date
 
     def __repr__(self) -> str:
-        return f"PendingAndRunningTaskView(service={self.service}, status={self.status}, submition_date={self.submition_date}, start_date={self.start_date})"
+        return (
+            f"PendingAndRunningTaskView(service={self.service},"
+            "status={self.status}, submition_date={self.submition_date},"
+            "start_date={self.start_date})"
+        )
 
 
 class MetricsTaskRepository:
@@ -54,7 +58,7 @@ class MetricsTaskRepository:
     async def running_and_pending_tasks(self) -> list[PendingAndRunningTaskView]:
         rows = await self.db.execute(
             statement=select(Task.service, Task.status, Task.submition_date, Task.start_date).where(
-                or_(Task.status == TaskStatus.PENDING, Task.status == TaskStatus.RUNNING),
+                or_(Task.status == TaskStatus.PENDING, Task.status == TaskStatus.IN_PROGRESS),
             ),
         )
         return [
