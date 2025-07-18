@@ -17,7 +17,7 @@ class QueueListener:
         service_repository: ServicesConfigRepository,
         rabbitmq_url: str,
         concurrency: int = 20,
-    ) -> None:
+    ):
         self.service_repository = service_repository
         self.rabbit_url = rabbitmq_url
         self.message_service = message_service
@@ -26,15 +26,22 @@ class QueueListener:
         self.consumer_task: list[asyncio.Task] = []
         self.stop_event = asyncio.Event()
 
-    async def process_message(self, message: AbstractIncomingMessage, service_name: str) -> None:
+    async def process_message(
+        self,
+        message: AbstractIncomingMessage,
+        service_name: str,
+    ):
         async with message.process():
             try:  # auto-ack à la fin du bloc
-                await self.message_service.process(message.body.decode(), service_name=service_name)
+                await self.message_service.process(
+                    message.body.decode(),
+                    service_name=service_name,
+                )
             except MessageServiceError as e:
                 logger.error(f"Error: {e}")
 
     def message_handler(self, service_name: str):
-        async def inner_message_handler(message: AbstractIncomingMessage) -> None:
+        async def inner_message_handler(message: AbstractIncomingMessage):
             # Non blocking message processing (another task is created)
             task = asyncio.create_task(
                 self.process_message(message=message, service_name=service_name),
@@ -55,16 +62,20 @@ class QueueListener:
                 logger.error(f"Connection failure : {e}. Retry in 5s...")
                 await asyncio.sleep(5)
 
-    async def start(self) -> None:
+    async def start(self):
         logger.info("----------------------------")
-        logger.info(f"⏳ Connecting to the output queues (concurrency: {self.concurrency})...")
+        logger.info(
+            f"⏳ Connecting to the output queues (concurrency: {self.concurrency})...",
+        )
         connection = await self.wait_for_connection()
 
         channel = await connection.channel()
         await channel.set_qos(prefetch_count=self.concurrency)
 
         for service in self.service_repository.all_services().values():
-            logger.info(f"- Listen service '{service.name}' on response queue '{service.out_queue}'")
+            logger.info(
+                f"- Listen service '{service.name}' on response queue '{service.out_queue}'",
+            )
             queue = await channel.declare_queue(service.out_queue, durable=True)
             await queue.consume(self.message_handler(service.name))
         logger.info("🤗 Done.")

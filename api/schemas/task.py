@@ -7,8 +7,18 @@ from api.schemas.enum import TaskStatus
 
 
 class Callback(BaseModel):
-    url: str | None = Field(default=None, description="URL ou AMQP DSN à appeler en callback")
-    type: Literal["http", "amqp"] | None = Field(default=None, description="Type de callback (http ou amqp)")
+    url: str | None = Field(
+        default=None,
+        description="URL ou AMQP DSN à appeler en callback",
+    )
+    type: Literal["http", "amqp"] | None = Field(
+        default=None,
+        description="Type de callback (http ou amqp)",
+    )
+    queue: str | None = Field(
+        default=None,
+        description="Nom de la file d'attente pour les callbacks AMQP",
+    )
 
 
 class TaskInfo(BaseModel):

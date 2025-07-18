@@ -1,17 +1,15 @@
 import datetime
 import json
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.models.task import Task
 from api.repositories.task_repository import TaskRepository
 from api.schemas.enum import TaskStatus
 from listener.core.logger import logger
 from listener.services.notifier_service import NotificationService
-
-if TYPE_CHECKING:
-    from api.models import Task
 
 
 # ---------------------------------
@@ -64,7 +62,7 @@ class MessageService:
         task_repository: TaskRepository,
         notification_service: NotificationService,
         session: AsyncSession,
-    ) -> None:
+    ):
         self.task_repository = task_repository
         self.notification_service = notification_service
         self.session = session
@@ -72,13 +70,13 @@ class MessageService:
     def to_onliner_message(self, message: str) -> str:
         """Remove all CR + LF from the json message to display it in one line."""
         raw_message = message.replace("\n", "")
-        return raw_message.replace("\r", "")
+        raw_message = raw_message.replace("\r", "")
+        return raw_message
 
-    async def process(self, message: str, service_name: str) -> None:
-        logger.info(f"Start processing '{self.to_onliner_message(message)}'")
+    async def process(self, message: str, service_name: str):
+        logger.debug(f"Processing '{self.to_onliner_message(message)}'")
 
         try:
-            # Convert the json into MessageFromWorker type
             message_object = self.unmarshall_message(message)
 
             task_id = message_object.task_id
@@ -86,14 +84,16 @@ class MessageService:
 
             if isinstance(data, StartMessage):
                 await self.process_start_message(task_id, service_name, data)
-            if isinstance(data, ProgressMessage):
+                logger.info(f"Task {task_id} started processing")
+            elif isinstance(data, ProgressMessage):
                 await self.process_progress_message(task_id, service_name, data)
-            if isinstance(data, SuccessMessage):
+                logger.info(f"Task {task_id} progress updated: {data.progress}%")
+            elif isinstance(data, SuccessMessage):
                 await self.process_success_message(task_id, service_name, data)
-            if isinstance(data, FailureMessage):
+                logger.info(f"Task {task_id} completed successfully")
+            elif isinstance(data, FailureMessage):
                 await self.process_failure_message(task_id, service_name, data)
-
-            logger.info(f"End processing '{self.to_onliner_message(message)}'")
+                logger.info(f"Task {task_id} failed: {data.error_message}")
 
             logger.debug("commit()")
             await self.session.commit()
@@ -108,44 +108,65 @@ class MessageService:
     def unmarshall_message(self, message: str) -> MessageFromWorker:
         try:
             return MessageFromWorker.model_validate_json(message)
-        except Exception as exc:
-            msg = f"Not a valid message: '{self.to_onliner_message(message)}'"
-            raise MessageServiceError(msg) from exc
+        except Exception as e:
+            raise MessageServiceError(
+                f"Not a valid message: '{self.to_onliner_message(message)}'",
+            ) from e
 
-    async def process_start_message(self, task_id: str, service_name: str, data: StartMessage) -> None:
+    async def process_start_message(
+        self,
+        task_id: str,
+        service_name: str,
+        data: StartMessage,
+    ) -> None:
         logger.debug("Handling start message")
-        task = await self.task_repository.get_task_by_id(task_id, service_name)
+        task: Task | None = await self.task_repository.get_task_by_id(
+            task_id,
+            service_name,
+        )
         if task is None:
-            msg = f"Task not found, task_id: '{task_id}', service_name: '{service_name}'"
-            raise MessageServiceError(msg)
+            raise MessageServiceError(
+                f"Task not found, task_id: '{task_id}', service_name: '{service_name}'",
+            )
 
-        task.status = TaskStatus.IN_PROGRESS
-        task.start_date = datetime.datetime.now()
-        task.worker_host = data.hostname
-        task.progress = 0.0
+        task.status = TaskStatus.IN_PROGRESS  # type: ignore
+        task.start_date = datetime.datetime.now()  # type: ignore
+        task.worker_host = data.hostname  # type: ignore
+        task.progress = 0.0  # type: ignore
 
-    async def process_progress_message(self, task_id: str, service_name: str, data: ProgressMessage) -> None:
+    async def process_progress_message(
+        self,
+        task_id: str,
+        service_name: str,
+        data: ProgressMessage,
+    ):
         logger.debug("Handling progress message")
         task = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
-            msg = f"Task not found, task_id: '{task_id}', service_name: '{service_name}'"
-            raise MessageServiceError(msg)
-        task.progress = data.progress
+            raise MessageServiceError(
+                f"Task not found, task_id: '{task_id}', service_name: '{service_name}'",
+            )
+        task.progress = data.progress  # type: ignore
 
-    async def process_success_message(self, task_id: str, service_name: str, data: SuccessMessage) -> None:
+    async def process_success_message(
+        self,
+        task_id: str,
+        service_name: str,
+        data: SuccessMessage,
+    ):
         logger.debug("Handling success message")
         task = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
-            msg = f"Task not found, task_id: '{task_id}', service_name: '{service_name}'"
-            raise MessageServiceError(msg)
+            raise MessageServiceError(
+                f"Task not found, task_id: '{task_id}', service_name: '{service_name}'",
+            )
 
-        task.status = TaskStatus.SUCCESS
-        task.progress = 100
-        task.end_date = datetime.datetime.now()
-        task.response = json.dumps(data.response)
+        task.status = TaskStatus.SUCCESS  # type: ignore
+        task.end_date = datetime.datetime.now()  # type: ignore
+        task.response = json.dumps(data.response)  # type: ignore
 
-        callback_dict: dict = task.callback if task.callback is not None else {}
-        if callback_dict:
+        callback_dict: dict = task.callback  # type: ignore
+        if callback_dict is not None:
             message = {
                 "task_id": task_id,
                 "status": "SUCCESS",
@@ -157,18 +178,23 @@ class MessageService:
             }
             try:
                 await self.notification_service.notify(callback_dict, message)
-                task.notification_status = "SUCCESS"
+                task.notification_status = "SUCCESS"  # type: ignore
             except Exception as e:
                 logger.error(f"Notification failure for task_id '{task_id}': {e}")
-                task.notification_status = "FAILURE"
-        task.notification_status = "SUCCESS"
+                task.notification_status = "FAILURE"  # type: ignore
 
-    async def process_failure_message(self, task_id: str, service_name: str, data: FailureMessage) -> None:
+    async def process_failure_message(
+        self,
+        task_id: str,
+        service_name: str,
+        data: FailureMessage,
+    ):
         logger.debug("Handling failure message")
         task: Task | None = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
-            msg = f"Task not found, task_id: '{task_id}', service_name: '{service_name}'"
-            raise MessageServiceError(msg)
+            raise MessageServiceError(
+                f"Task not found, task_id: '{task_id}', service_name: '{service_name}'",
+            )
 
         task.status = TaskStatus.FAILURE  # type: ignore
         task.end_date = datetime.datetime.now()  # type: ignore

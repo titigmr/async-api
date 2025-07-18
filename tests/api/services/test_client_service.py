@@ -7,7 +7,7 @@ from api.services.client_service import ClientService
 
 
 @pytest.fixture
-def client_config_repo_mock():
+def client_config_repo_mock() -> Mock:
     client_config_repo_mock: ClientConfigRepository = Mock()  # type: ignore
     data = {
         "client1_id": ClientConfig(

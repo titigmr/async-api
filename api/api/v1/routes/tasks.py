@@ -1,5 +1,4 @@
 import http
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, status
@@ -16,14 +15,11 @@ from api.schemas import (
     TaskResponse,
 )
 from api.schemas.enum import ErrorEnum, TaskStatus
-from api.schemas.errors import (
-    TaskNotFound,
-)
+from api.schemas.errors import TaskNotFound
 from api.services import TaskService
 
 router = APIRouter(tags=["Tasks"])
 callback_router = APIRouter()
-logger: logging.Logger = logging.getLogger(name="uvicorn.error")
 
 
 @callback_router.post(path="{$callback.url}")

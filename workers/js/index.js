@@ -48,7 +48,7 @@ class MessageSender {
                 message_type: "started",
                 hostname: os.hostname()
             }
-        }) 
+        })
     }
 
     async sendSuccessMessage(task_id, result) {
@@ -125,11 +125,11 @@ class TaskManager {
 
         const content = msg.content.toString();
         console.log(`[Listener ${channelIndex}] Reçu : ${content}`);
-        const submissionMessage = this.parseSubmissionMessage(content); 
+        const submissionMessage = this.parseSubmissionMessage(content);
 
         try {
             if (submissionMessage) {
-                console.log("[Listener ${channelIndex}] Submission : ",submissionMessage);
+                console.log(`[Listener ${channelIndex}] Submission : `,submissionMessage);
                 try {
                     await this.messageSender.sendStartMessage(submissionMessage.task_id);
                     let task = this.taskFactory();
@@ -172,7 +172,7 @@ class TaskManager {
         this.isShuttingDown=true;
 
         // Arret des channels sans message en cours.
-        // On ne veut pas qu'un channel en attente 
+        // On ne veut pas qu'un channel en attente
         // puisse capter un message lors de l'arret
         // d'un autre listener (requeue)
         for (const channelIndex in this.channels) {
@@ -243,7 +243,7 @@ class MyTask {
 // EXECUTION
 //------------------------
 let taskManager = new TaskManager(
-    RABBITMQ_URL, 
+    RABBITMQ_URL,
     RABBITMQ_USER,
     RABBITMQ_PASSWORD,
     IN_QUEUE_NAME,

@@ -1,7 +1,7 @@
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from api.core.utils import logger
+from api.logging_config import logger
 
 
 class ErrorDetail(BaseModel):
@@ -23,8 +23,7 @@ class AppException(Exception):
     def __init__(self, details: str | None = None) -> None:
         self.details: str | None = details
         logger.error(
-            msg=f"Internal server error: {self.number} - {self.description}",
-            extra={"details": self.details},
+            f"Internal server error: {self.number} - {self.description} | Details: {self.details}"
         )
 
     def to_response(self) -> JSONResponse:

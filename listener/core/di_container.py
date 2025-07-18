@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.core.config import Settings
 from api.repositories.services_config_repository import ServicesConfigRepository
 from api.repositories.task_repository import TaskRepository
-from listener.core.logger import logger
+from listener.core.logger import configure_logger, logger
 from listener.core.task_aware_async_session import TaskAwareAsyncSession
 from listener.services.message_service import MessageService
 from listener.services.notifier_service import NotificationService
@@ -19,14 +19,14 @@ class DIContainer:
         # Loading setting
         self.settings = settings
 
-        # Setup log level
-        logger.setLevel(self.settings.LISTENER_LOG_LEVEL)
+        # Setup log level avec les settings
+        configure_logger(self.settings.LISTENER_LOG_LEVEL)
 
         # Prefetch service config
         logger.info("----------------------------")
         logger.info("⏳ Loading services configuration ...")
-        logger.info(f"Using services config file: {settings.SERVICES_CONFIG_FILE}")
-        ServicesConfigRepository.load_services_config(settings.SERVICES_CONFIG_FILE)
+        logger.info(f"Using services config file: {self.settings.SERVICES_CONFIG_FILE}")
+        ServicesConfigRepository.load_services_config(self.settings.SERVICES_CONFIG_FILE)
         for service in ServicesConfigRepository.SERVICES:
             logger.info(f"- Service loaded: {service}")
         logger.info("🤗 Done.")
@@ -52,7 +52,11 @@ class DIContainer:
         )
 
     def message_service(self):
-        return MessageService(self.task_repository(), self.notification_service(), self.session())
+        return MessageService(
+            self.task_repository(),
+            self.notification_service(),
+            self.session(),
+        )
 
     def service_repository(self):
         return ServicesConfigRepository()

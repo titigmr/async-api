@@ -32,6 +32,5 @@ class NotificationService:
     async def notify(self, callback: dict, message: dict) -> None:
         notifier = self.find_notifier_for_message(callback)
         if notifier is None:
-            msg = f"No notifier found for callback {callback}"
-            raise NotificationException(msg)
+            raise NotificationException(f"No notifier found for callback {callback}")
         await notifier.notify(callback, message)

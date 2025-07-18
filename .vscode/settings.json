@@ -3,5 +3,37 @@
     "tests"
   ],
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestEnabled": true
+  "python.testing.pytestEnabled": true,
+  "chat.mcp.serverSampling": {
+        "api/.vscode/mcp.json: MCP_DOCKER": {
+            "allowedModels": [
+                "github.copilot-chat/gpt-4.1",
+                "github.copilot-chat/claude-3.5-sonnet",
+                "github.copilot-chat/claude-3.7-sonnet",
+                "github.copilot-chat/claude-3.7-sonnet-thought",
+                "github.copilot-chat/claude-sonnet-4",
+                "github.copilot-chat/gemini-2.0-flash-001",
+                "github.copilot-chat/gemini-2.5-pro",
+                "github.copilot-chat/gpt-4o",
+                "github.copilot-chat/o1",
+                "github.copilot-chat/o3-mini",
+                "github.copilot-chat/o4-mini"
+            ]
+        }
+    },
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        }
+    },
+    "ruff.configuration": "./pyproject.toml",
+    "ruff.lint.enable": true,
+    "ruff.organizeImports": true,
+    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit"
+    }
 }

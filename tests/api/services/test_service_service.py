@@ -18,7 +18,11 @@ def services_config_repo_mock() -> ServicesConfigRepository:
             out_queue="example_out_queue",
         ),
         "example2": ServicesConfig(
-            name="example2", quotas=None, json_schema=None, in_queue="the_in_queue", out_queue="the_out_queue",
+            name="example2",
+            quotas=None,
+            json_schema=None,
+            in_queue="the_in_queue",
+            out_queue="the_out_queue",
         ),
     }
     return services_config_repo_mock

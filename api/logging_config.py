@@ -1,8 +1,15 @@
+"""
+Configuration des logs avec loguru pour intercepter tous les logs uvicorn.
+Ce module doit être importé avant le démarrage d'uvicorn.
+"""
+
 import asyncio
 import logging
 import sys
 
 from loguru import logger as loguru_logger
+
+from api.core.config import settings
 
 
 def get_task_name() -> str:
@@ -19,33 +26,26 @@ class InterceptHandler(logging.Handler):
     """Handler pour intercepter les logs du module logging standard et les rediriger vers loguru"""
 
     def emit(self, record):
-        # Récupère le niveau correspondant de loguru
         try:
             level = loguru_logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
-
-        # Trouve le frame du caller
         frame, depth = logging.currentframe(), 2
         while frame and frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
-
         loguru_logger.opt(depth=depth, exception=record.exc_info).log(
-            level,
-            record.getMessage(),
+            level, record.getMessage()
         )
 
 
-def configure_logger(log_level: str = "INFO"):
-    """Configure loguru avec des couleurs et le format personnalisé"""
-    # Utilise le niveau de log fourni en paramètre
-    log_level = log_level.upper()
+def setup_logging():
+    """Configure loguru pour intercepter tous les logs, y compris uvicorn"""
+
+    log_level = settings.API_LOG_LEVEL.upper()
 
     # Supprime le handler par défaut de loguru
     loguru_logger.remove()
-
-    # Ajoute un handler personnalisé avec couleurs et format
     loguru_logger.add(
         sys.stdout,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
@@ -59,13 +59,15 @@ def configure_logger(log_level: str = "INFO"):
     )
 
     # Intercepte tous les logs du module logging standard
-    logging.basicConfig(handlers=[InterceptHandler()], level=0)
-
-    # Configure spécifiquement les loggers qui pourraient être utilisés
+    logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
     loggers_to_intercept = [
         "",
-        "aio_pika",
-        "asyncio",
+        "uvicorn",
+        "uvicorn.error",
+        "uvicorn.access",
+        "fastapi",
+        "starlette",
+        "multipart",
     ]
 
     for logger_name in loggers_to_intercept:
@@ -75,5 +77,5 @@ def configure_logger(log_level: str = "INFO"):
         logging_logger.propagate = False
 
 
-# Exporte le logger configuré (sera configuré par le DI container)
+setup_logging()
 logger = loguru_logger
