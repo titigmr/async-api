@@ -1,0 +1,54 @@
+@hostname = localhost
+@port = 8000
+@scheme = http
+@host = {{scheme}}://{{hostname}}:{{port}}
+
+@service_name = example
+@client_id = client1
+@client_secret =
+@amqp_url = amqp://kalo:kalo@broker:5672/
+
+###
+# Retourne les métriques prometheus
+GET {{host}}/internal/metrics  HTTP/1.1
+
+###
+# Sonde healthcheck
+GET {{host}}/internal/health
+
+###
+# Sonde readiness
+GET {{host}}/internal/readiness
+
+###
+# Liste les services disponibles
+GET {{host}}/v1/services
+
+
+###
+# Créé une tâche
+# @name createTask
+
+POST {{host}}/v1/services/{{service_name}}/tasks
+Content-Type: application/json
+Authorization: Basic {{client_id}}:{{client_secret}}
+
+{
+    "body": {
+        "sleep": 1,
+        "mustSucceed": true
+    },
+    "callback": {
+        "type": "amqp",
+        "url": "{{amqp_url}}",
+        "queue": "notification-{{service_name}}-{{client_id}}"
+    }
+}
+
+###
+# Get une tâche
+
+GET {{host}}/v1/services/{{service_name}}/tasks/{{createTask.response.body.data.task_id}}
+Content-Type: application/json
+Authorization: Basic {{client_id}}:{{client_secret}}
+
