@@ -68,7 +68,7 @@ class MetricsService:
                 self.TASKS_LATENCY_PENDING.labels(service=metric.service).observe(
                     (now - metric.submition_date).total_seconds(),
                 )
-            elif metric.status == TaskStatus.RUNNING and metric.start_date:
+            elif metric.status == TaskStatus.IN_PROGRESS and metric.start_date:
                 self.TASKS_LATENCY_RUNNING.labels(service=metric.service).observe(
                     (now - metric.start_date).total_seconds(),
                 )
@@ -77,7 +77,7 @@ class MetricsService:
         for metric in count_result:
             if metric.status == TaskStatus.PENDING:
                 self.TASKS_PENDING_COUNT.labels(service=metric.service).set(metric.count)
-            elif metric.status == TaskStatus.RUNNING:
+            elif metric.status == TaskStatus.IN_PROGRESS:
                 self.TASKS_IN_PROGRESS_COUNT.labels(service=metric.service).set(metric.count)
             elif metric.status == TaskStatus.SUCCESS:
                 self.TASKS_SUCCESS_COUNT.labels(service=metric.service).set(metric.count)
