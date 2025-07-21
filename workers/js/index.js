@@ -90,9 +90,17 @@ class TaskManager {
     }
 
     async start() {
-        const opt = { credentials: amqp.credentials.plain(this.rabbitmqUser, this.rabbitmqPassword) };
-        const connection = await amqp.connect(this.rabbitmqUrl,opt);
-
+        let connection = null;
+        while (true) {
+            const opt = { credentials: amqp.credentials.plain(this.rabbitmqUser, this.rabbitmqPassword) };
+            try {
+                connection = await amqp.connect(this.rabbitmqUrl,opt);
+                break;
+            } catch (error) {
+                console.log("Connection error, retry in 2s.")
+                await sleepMs(2000)
+            }
+        }
         // Gestion SIGTERM
         process.on('SIGTERM', async () => {
             await this.shutdown(connection);

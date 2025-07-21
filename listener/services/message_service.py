@@ -1,15 +1,17 @@
 import datetime
 import json
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.models.task import Task
 from api.repositories.task_repository import TaskRepository
-from api.schemas.enum import TaskStatus
+from api.schemas.enum import CallbackStatus, TaskStatus
 from listener.core.logger import logger
 from listener.services.notifier_service import NotificationService
+
+if TYPE_CHECKING:
+    from api.models.task import Task
 
 
 # ---------------------------------
@@ -62,18 +64,18 @@ class MessageService:
         task_repository: TaskRepository,
         notification_service: NotificationService,
         session: AsyncSession,
-    ):
+    ) -> None:
         self.task_repository = task_repository
         self.notification_service = notification_service
         self.session = session
 
-    def to_onliner_message(self, message: str) -> str:
+    @staticmethod
+    def to_onliner_message(message: str) -> str:
         """Remove all CR + LF from the json message to display it in one line."""
         raw_message = message.replace("\n", "")
-        raw_message = raw_message.replace("\r", "")
-        return raw_message
+        return raw_message.replace("\r", "")
 
-    async def process(self, message: str, service_name: str):
+    async def process(self, message: str, service_name: str) -> None:
         logger.debug(f"Processing '{self.to_onliner_message(message)}'")
 
         try:
@@ -139,7 +141,7 @@ class MessageService:
         task_id: str,
         service_name: str,
         data: ProgressMessage,
-    ):
+    ) -> None:
         logger.debug("Handling progress message")
         task = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
@@ -153,7 +155,7 @@ class MessageService:
         task_id: str,
         service_name: str,
         data: SuccessMessage,
-    ):
+    ) -> None:
         logger.debug("Handling success message")
         task = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
@@ -161,33 +163,34 @@ class MessageService:
                 f"Task not found, task_id: '{task_id}', service_name: '{service_name}'",
             )
 
-        task.status = TaskStatus.SUCCESS
+        task.status = str(TaskStatus.SUCCESS)
         task.response = json.dumps(data.response)
-
+        end_date: datetime.datetime = datetime.datetime.now()
+        task.end_date = end_date
         callback_dict: dict = task.callback  # type: ignore
         if callback_dict is not None:
             message = {
                 "task_id": task_id,
-                "status": "SUCCESS",
+                "status": TaskStatus.SUCCESS,
                 "submition_date": task.submition_date.isoformat(),
                 "start_date": task.start_date.isoformat() if task.start_date is not None else None,
-                "end_date": task.end_date.isoformat() if task.end_date is not None else None,
+                "end_date": end_date.isoformat(),
                 "progress": 100.0,
                 "response": data.response,
             }
             try:
                 await self.notification_service.notify(callback_dict, message)
-                task.notification_status = "SUCCESS"
+                task.notification_status = str(CallbackStatus.SUCCESS)
             except Exception as e:
                 logger.error(f"Notification failure for task_id '{task_id}': {e}")
-                task.notification_status = "FAILURE"
+                task.notification_status = str(CallbackStatus.FAILURE)
 
     async def process_failure_message(
         self,
         task_id: str,
         service_name: str,
         data: FailureMessage,
-    ):
+    ) -> None:
         logger.debug("Handling failure message")
         task: Task | None = await self.task_repository.get_task_by_id(task_id, service_name)
         if task is None:
@@ -195,23 +198,25 @@ class MessageService:
                 f"Task not found, task_id: '{task_id}', service_name: '{service_name}'",
             )
 
-        task.status = TaskStatus.FAILURE
+        end_date = datetime.datetime.now()
+        task.status = str(TaskStatus.FAILURE)
+        task.end_date = end_date
         task.error_message = data.error_message
 
         callback_dict: dict = task.callback  # type: ignore
         if callback_dict is not None:
             message = {
                 "task_id": task_id,
-                "status": "FAILURE",
+                "status": TaskStatus.FAILURE,
                 "submition_date": task.submition_date.isoformat(),
                 "start_date": task.start_date.isoformat() if task.start_date is not None else None,
-                "end_date": task.end_date.isoformat() if task.end_date is not None else None,
+                "end_date": end_date.isoformat(),
                 "progress": task.progress,
                 "error_message": data.error_message,
             }
             try:
                 await self.notification_service.notify(callback_dict, message)
-                task.notification_status = "SUCCESS"
+                task.notification_status = str(CallbackStatus.SUCCESS)
             except Exception as e:
                 logger.error(f"Notification failure for task_id '{task_id}': {e}")
-                task.notification_status = "FAILURE"
+                task.notification_status = str(CallbackStatus.FAILURE)
