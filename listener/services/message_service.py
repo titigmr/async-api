@@ -161,11 +161,8 @@ class MessageService:
                 f"Task not found, task_id: '{task_id}', service_name: '{service_name}'",
             )
 
-        end_date = datetime.datetime.now()
         task.status = TaskStatus.SUCCESS
-        task.end_date = end_date 
-        task.response = json.dumps(data.response) 
-
+        task.response = json.dumps(data.response)
 
         callback_dict: dict = task.callback  # type: ignore
         if callback_dict is not None:
@@ -173,8 +170,8 @@ class MessageService:
                 "task_id": task_id,
                 "status": "SUCCESS",
                 "submition_date": task.submition_date.isoformat(),
-                "start_date":   task.start_date.isoformat() if task.start_date is not None else None,
-                "end_date":     end_date,
+                "start_date": task.start_date.isoformat() if task.start_date is not None else None,
+                "end_date": task.end_date.isoformat() if task.end_date is not None else None,
                 "progress": 100.0,
                 "response": data.response,
             }
@@ -198,25 +195,23 @@ class MessageService:
                 f"Task not found, task_id: '{task_id}', service_name: '{service_name}'",
             )
 
-        end_date = datetime.datetime.now()
-        task.status = TaskStatus.FAILURE  
-        task.end_date = end_date  
-        task.error_message = data.error_message 
+        task.status = TaskStatus.FAILURE
+        task.error_message = data.error_message
 
         callback_dict: dict = task.callback  # type: ignore
         if callback_dict is not None:
             message = {
                 "task_id": task_id,
-                "status": "SUCCESS",
+                "status": "FAILURE",
                 "submition_date": task.submition_date.isoformat(),
                 "start_date": task.start_date.isoformat() if task.start_date is not None else None,
-                "end_date": end_date,
+                "end_date": task.end_date.isoformat() if task.end_date is not None else None,
                 "progress": task.progress,
                 "error_message": data.error_message,
             }
             try:
                 await self.notification_service.notify(callback_dict, message)
-                task.notification_status = "SUCCESS" 
+                task.notification_status = "SUCCESS"
             except Exception as e:
                 logger.error(f"Notification failure for task_id '{task_id}': {e}")
                 task.notification_status = "FAILURE"
