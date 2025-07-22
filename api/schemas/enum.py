@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class ErrorEnum(Enum):
+class ErrorEnum(StrEnum):
     """Error codes for the application."""
 
     TASK_NOT_FOUND = "Task not found"
@@ -9,7 +9,7 @@ class ErrorEnum(Enum):
     SERVICE_UNAVAILABLE = "Service unavailable, please try again later"
 
 
-class TaskStatus(Enum):
+class TaskStatus(StrEnum):
     """Status codes for the application."""
 
     PENDING = "pending"
@@ -18,7 +18,7 @@ class TaskStatus(Enum):
     FAILURE = "failure"
 
 
-class CallbackStatus(Enum):
+class CallbackStatus(StrEnum):
     """Status codes for the callback."""
 
     SUCCESS = "success"

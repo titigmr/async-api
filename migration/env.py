@@ -1,12 +1,33 @@
+import os
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from api.core.database import Base
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
+# Set the sqlalchemy.url from environment variable if available
+database_url = os.getenv("DATABASE_URL")
+if database_url:
+    # Cleanly handle async database URLs for Alembic (sync-only)
+    ASYNC_TO_SYNC_DRIVERS = {
+        "postgresql+asyncpg://": "postgresql+psycopg2://",
+        "mysql+aiomysql://": "mysql+pymysql://",
+        "sqlite+aiosqlite://": "sqlite+pysqlite://",
+    }
+
+    def make_sync_url(url: str) -> str:
+        for async_prefix, sync_prefix in ASYNC_TO_SYNC_DRIVERS.items():
+            if url.startswith(async_prefix):
+                return url.replace(async_prefix, sync_prefix, 1)
+        return url
+
+    if database_url:
+        config.set_main_option("sqlalchemy.url", make_sync_url(database_url))
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
@@ -17,7 +38,6 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 
-from api.core.database import Base
 
 target_metadata = Base.metadata
 
@@ -65,7 +85,10 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

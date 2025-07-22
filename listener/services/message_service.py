@@ -163,7 +163,7 @@ class MessageService:
                 f"Task not found, task_id: '{task_id}', service_name: '{service_name}'",
             )
 
-        task.status = str(TaskStatus.SUCCESS)
+        task.status = TaskStatus.SUCCESS
         task.response = json.dumps(data.response)
         end_date: datetime.datetime = datetime.datetime.now()
         task.end_date = end_date
@@ -180,10 +180,10 @@ class MessageService:
             }
             try:
                 await self.notification_service.notify(callback_dict, message)
-                task.notification_status = str(CallbackStatus.SUCCESS)
+                task.notification_status = CallbackStatus.SUCCESS
             except Exception as e:
                 logger.error(f"Notification failure for task_id '{task_id}': {e}")
-                task.notification_status = str(CallbackStatus.FAILURE)
+                task.notification_status = CallbackStatus.FAILURE
 
     async def process_failure_message(
         self,
@@ -199,11 +199,11 @@ class MessageService:
             )
 
         end_date = datetime.datetime.now()
-        task.status = str(TaskStatus.FAILURE)
+        task.status = TaskStatus.FAILURE
         task.end_date = end_date
         task.error_message = data.error_message
 
-        callback_dict: dict = task.callback  # type: ignore
+        callback_dict = task.callback
         if callback_dict is not None:
             message = {
                 "task_id": task_id,
@@ -216,7 +216,7 @@ class MessageService:
             }
             try:
                 await self.notification_service.notify(callback_dict, message)
-                task.notification_status = str(CallbackStatus.SUCCESS)
+                task.notification_status = CallbackStatus.SUCCESS
             except Exception as e:
                 logger.error(f"Notification failure for task_id '{task_id}': {e}")
-                task.notification_status = str(CallbackStatus.FAILURE)
+                task.notification_status = CallbackStatus.FAILURE

@@ -3,7 +3,7 @@ from typing import Any
 
 import yaml
 
-from api.logging_config import logger
+from api.core.logger import logger
 
 
 class ServicesConfig:

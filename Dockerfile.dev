@@ -5,11 +5,16 @@ COPY --from=ghcr.io/astral-sh/uv:latest uv /usr/local/bin/uv
 RUN apt-get update -y
 RUN apt-get install -y npm
 RUN npm install -g nodemon
- 
+
 COPY pyproject.toml .
 RUN uv sync
 COPY api api
 COPY listener listener
+COPY migration migration
+COPY alembic.ini .
+COPY scripts scripts
+COPY scripts/run_migrations.py /app
 COPY scripts/entrypoint_dev.sh /app/entrypoint.sh
 ENV PATH=/app/.venv/bin/:$PATH
+ENV PYTHONPATH=/app
 CMD ["./entrypoint.sh"]

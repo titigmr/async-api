@@ -25,7 +25,7 @@ def get_task_name() -> str:
 class InterceptHandler(logging.Handler):
     """Handler pour intercepter les logs du module logging standard et les rediriger vers loguru"""
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         try:
             level = loguru_logger.level(record.levelname).name
         except ValueError:
@@ -35,11 +35,12 @@ class InterceptHandler(logging.Handler):
             frame = frame.f_back
             depth += 1
         loguru_logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
+            level,
+            record.getMessage(),
         )
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Configure loguru pour intercepter tous les logs, y compris uvicorn"""
 
     log_level = settings.API_LOG_LEVEL.upper()
