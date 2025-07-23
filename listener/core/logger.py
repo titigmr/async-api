@@ -18,7 +18,7 @@ def get_task_name() -> str:
 class InterceptHandler(logging.Handler):
     """Handler pour intercepter les logs du module logging standard et les rediriger vers loguru"""
 
-    def emit(self, record):
+    def emit(self, record) -> None:
         # Récupère le niveau correspondant de loguru
         try:
             level = loguru_logger.level(record.levelname).name
@@ -37,15 +37,12 @@ class InterceptHandler(logging.Handler):
         )
 
 
-def configure_logger(log_level: str = "INFO"):
+def configure_logger(log_level: str = "INFO") -> None:
     """Configure loguru avec des couleurs et le format personnalisé"""
-    # Utilise le niveau de log fourni en paramètre
     log_level = log_level.upper()
 
-    # Supprime le handler par défaut de loguru
     loguru_logger.remove()
 
-    # Ajoute un handler personnalisé avec couleurs et format
     loguru_logger.add(
         sys.stdout,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
@@ -69,7 +66,7 @@ def configure_logger(log_level: str = "INFO"):
     ]
 
     for logger_name in loggers_to_intercept:
-        logging_logger = logging.getLogger(logger_name)
+        logging_logger = logging.getLogger(name=logger_name)
         logging_logger.handlers = [InterceptHandler()]
         logging_logger.setLevel(logging.INFO)
         logging_logger.propagate = False

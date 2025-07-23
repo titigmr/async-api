@@ -35,8 +35,8 @@ Authorization: Basic {{client_id}}:{{client_secret}}
 
 {
     "body": {
-        "sleep": 5,
-        "mustSucceed": false
+        "sleep": 10,
+        "mustSucceed": true
     },
     "callback": {
         "type": "amqp",

@@ -18,10 +18,10 @@ class QueueListener:
         rabbitmq_url: str,
         concurrency: int = 20,
     ) -> None:
-        self.service_repository = service_repository
-        self.rabbit_url = rabbitmq_url
-        self.message_service = message_service
-        self.concurrency = concurrency
+        self.service_repository: ServicesConfigRepository = service_repository
+        self.rabbit_url: str = rabbitmq_url
+        self.message_service: MessageService = message_service
+        self.concurrency: int = concurrency
 
         self.consumer_task: list[asyncio.Task] = []
         self.stop_event = asyncio.Event()
@@ -34,7 +34,7 @@ class QueueListener:
         async with message.process():
             try:  # auto-ack à la fin du bloc
                 await self.message_service.process(
-                    message.body.decode(),
+                    message=message.body.decode(),
                     service_name=service_name,
                 )
             except MessageServiceError as e:
@@ -43,18 +43,14 @@ class QueueListener:
     def task_done_callback(self, task: asyncio.Task) -> None:
         self.consumer_task.remove(task)
 
-    def message_handler(self, service_name: str):
-        async def inner_message_handler(message: AbstractIncomingMessage) -> None:
-            # Non blocking message processing (another task is created)
-            logger.debug(f"New task created for service '{service_name}'. Active tasks: {len(self.consumer_task)}")
-            task = asyncio.create_task(
-                self.process_message(message=message, service_name=service_name),
-                context=Context(),
-            )
-            self.consumer_task.append(task)
-            task.add_done_callback(self.task_done_callback)
-
-        return inner_message_handler
+    async def message_handler(self, message: AbstractIncomingMessage, service_name: str) -> None:
+        # Non blocking message processing (another task is created)
+        task = asyncio.create_task(
+            self.process_message(message=message, service_name=service_name),
+            context=Context(),
+        )
+        self.consumer_task.append(task)
+        task.add_done_callback(self.task_done_callback)
 
     async def wait_for_connection(self) -> aio_pika.RobustConnection:
         while True:
@@ -68,7 +64,6 @@ class QueueListener:
                 await asyncio.sleep(5)
 
     async def start(self) -> None:
-        logger.info("----------------------------")
         logger.info(
             f"⏳ Connecting to the output queues (concurrency: {self.concurrency})...",
         )
@@ -82,10 +77,11 @@ class QueueListener:
                 f"- Listen service '{service.name}' on response queue '{service.out_queue}'",
             )
             queue = await channel.declare_queue(name=service.out_queue, durable=True)
-            await queue.consume(callback=self.message_handler(service_name=service.name))
+            await queue.consume(
+                callback=lambda msg, svc=service.name: self.message_handler(message=msg, service_name=svc),
+            )
         logger.info("🤗 Done.")
 
-        # Setup signal handler
         loop = asyncio.get_running_loop()
         loop.add_signal_handler(signal.SIGINT, self.stop)
         loop.add_signal_handler(signal.SIGTERM, self.stop)

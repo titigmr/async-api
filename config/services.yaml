@@ -8,4 +8,4 @@
   # json_schema: ./schemas/example.json # Default: No schema
   # quotas: 1000                        # Default: No quotas
   # in_queue: example_queue_in          # Default: <svc>_queue_in
-  # out_queue: example_queue_out        # Default: <svc>_queue_out 
+  # out_queue: example_queue_out        # Default: <svc>_queue_out

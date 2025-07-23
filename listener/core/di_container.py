@@ -17,10 +17,11 @@ class DIContainer:
         # Singletons
 
         # Loading setting
-        self.settings = settings
+        self.settings: Settings = settings
 
         # Setup log level avec les settings
-        configure_logger(self.settings.LISTENER_LOG_LEVEL)
+        logger.info(f"Listener log level: {self.settings.LISTENER_LOG_LEVEL}")
+        configure_logger(log_level=self.settings.LISTENER_LOG_LEVEL)
 
         # Prefetch service config
         logger.info("⏳ Loading services configuration ...")

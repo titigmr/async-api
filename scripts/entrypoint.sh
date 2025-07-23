@@ -50,21 +50,17 @@ run_migrations() {
     echo "✅ Migrations applied successfully!"
 }
 
-# Function to start the API
 start_api() {
     exec uvicorn --host "$API_HOST" \
         --port "$API_PORT" api.main:app \
-        --workers ${WORKERS:-1} \
-        --log-level ${LOG_LEVEL:-info}
+        --workers ${WORKERS:-1}
 }
 
-# Function to start the listener
 start_listener() {
     wait_for_database
     exec python3 listener/main.py
 }
 
-# Main script
 main() {
     echo "🐳 Starting container - Mode: $APP"
 

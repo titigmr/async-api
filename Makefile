@@ -154,3 +154,5 @@ health-check: ## Vérifie la santé des services
 	@curl -s http://localhost:8000/health > /dev/null && echo "✅ API OK" || echo "❌ API KO"
 	@echo "Vérification de RabbitMQ..."
 	@curl -s http://localhost:15672 > /dev/null && echo "✅ RabbitMQ OK" || echo "❌ RabbitMQ KO"
+	@echo "Vérification de la base de données..."
+	@docker compose exec db pg_isready -U postgres > /dev/null && echo "✅ DB OK" || echo "❌ DB KO"

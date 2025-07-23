@@ -55,10 +55,10 @@ run_migrations() {
 start_api_dev() {
     uvicorn --host "$API_HOST" \
         --port "$API_PORT" api.main:app \
-        --reload \
-        --log-level ${LOG_LEVEL:-debug}
+        --reload
 }
 start_listener_dev() {
+    echo "LISTENER_LOG_LEVEL: ${LISTENER_LOG_LEVEL}"
     nodemon --legacy-watch --exec python3 listener/main.py
 }
 

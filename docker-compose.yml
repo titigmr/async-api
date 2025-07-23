@@ -7,6 +7,7 @@ services:
       - ${PWD}/api:/app/api
       - ${PWD}/config:/app/config
       - ${PWD}/migrations:/app/migrations
+      - ${PWD}/scripts/entrypoint_dev.sh:/app/scripts/entrypoint.sh
     build:
       context: .
       dockerfile: Dockerfile.dev
@@ -16,7 +17,7 @@ services:
     #- db
     - broker
     env_file:
-    - .env.example
+    - .env
     environment:
       - APP=api
   listener:
@@ -26,6 +27,7 @@ services:
       - ${PWD}/api:/app/api
       - ${PWD}/listener:/app/listener
       - ${PWD}/config:/app/config
+      - ${PWD}/scripts/entrypoint_dev.sh:/app/scripts/entrypoint.sh
     build:
       context: .
       dockerfile: Dockerfile.dev
@@ -33,7 +35,7 @@ services:
     - db
     - broker
     env_file:
-    - .env.example
+    - .env
     environment:
       - APP=listener
   consumer:
@@ -48,13 +50,13 @@ services:
       - db
       - broker
     env_file:
-      - .env.example
+      - .env
   db:
     image: postgres:17
     volumes:
       - db-data:/var/lib/postgresql/data
     env_file:
-      - .env.example
+      - .env
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
