@@ -1,6 +1,5 @@
 FROM python:3.11-slim
 WORKDIR /app
-
 # Install necessary packages
 RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
 
@@ -11,7 +10,7 @@ RUN uv sync
 # Copying the application code
 COPY api api
 COPY listener listener
-COPY migration migration
+COPY migrations migrations
 COPY alembic.ini .
 COPY scripts/entrypoint.sh /app/
 

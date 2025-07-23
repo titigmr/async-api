@@ -88,12 +88,18 @@ migration-stamp-db: ## Change le pointeur alembic à une révision particulière
 	@read -p "ID de la révision : " revision; \
 	docker compose exec api alembic stamp $$revision
 
-migration-list-revision: ## Liste les révisions de la base de données
-	docker compose exec api alembic history
-
-migration-upgrade-revision: ## Crée une nouvelle révision de base de données
+migration-add-revision: ## Crée une nouvelle révision de base de données
 	@read -p "Message de révision : " msg; \
 	docker compose exec api alembic revision --autogenerate -m "$$msg"
+
+migration-upgrade: ## Applique les migrations de base de données
+	docker compose exec api alembic upgrade head
+
+migration-current: ## Affiche la révision actuelle de la base de données
+	docker compose exec api alembic current
+
+migration-history: ## Affiche l'historique détaillé des migrations
+	docker compose exec api alembic history --verbose
 
 test: ## Lance les tests avec pytest
 	uv run pytest -v

@@ -23,27 +23,25 @@ class DIContainer:
         configure_logger(self.settings.LISTENER_LOG_LEVEL)
 
         # Prefetch service config
-        logger.info("----------------------------")
         logger.info("⏳ Loading services configuration ...")
         logger.info(f"Using services config file: {self.settings.SERVICES_CONFIG_FILE}")
         ServicesConfigRepository.load_services_config(self.settings.SERVICES_CONFIG_FILE)
         for service in ServicesConfigRepository.SERVICES:
             logger.info(f"- Service loaded: {service}")
-        logger.info("🤗 Done.")
 
     def session(self) -> AsyncSession:
         return TaskAwareAsyncSession()  # type: ignore
 
-    def task_repository(self):
+    def task_repository(self) -> TaskRepository:
         return TaskRepository(self.session())
 
-    def http_notifier(self):
+    def http_notifier(self) -> HttpNotifier:
         return HttpNotifier(self.settings.LISTENER_NOTIFIER_RETRY)
 
-    def amqp_notifier(self):
+    def amqp_notifier(self) -> AmqpNotifier:
         return AmqpNotifier(self.settings.LISTENER_NOTIFIER_RETRY)
 
-    def notification_service(self):
+    def notification_service(self) -> NotificationService:
         return NotificationService(
             [
                 self.http_notifier(),
@@ -51,20 +49,20 @@ class DIContainer:
             ],
         )
 
-    def message_service(self):
+    def message_service(self) -> MessageService:
         return MessageService(
             self.task_repository(),
             self.notification_service(),
             self.session(),
         )
 
-    def service_repository(self):
+    def service_repository(self) -> ServicesConfigRepository:
         return ServicesConfigRepository()
 
     def app(self) -> QueueListener:
         return QueueListener(
-            self.message_service(),
-            self.service_repository(),
-            self.settings.BROKER_URL,
-            self.settings.LISTENER_CONCURRENCY,
+            message_service=self.message_service(),
+            service_repository=self.service_repository(),
+            rabbitmq_url=self.settings.BROKER_URL,
+            concurrency=self.settings.LISTENER_CONCURRENCY,
         )

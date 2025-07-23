@@ -1,7 +1,5 @@
 #!/bin/bash
-# Script de démarrage de l'API FastAPI avec Uvicorn et migration Alembic.
-
-set -e  # Arrêter le script en cas d'erreur
+set -e
 
 API_PORT="${PORT:-8000}"
 API_HOST="${HOST:-0.0.0.0}"
@@ -13,102 +11,79 @@ MAX_RETRIES="${MAX_RETRIES:-30}"
 RETRY_INTERVAL="${RETRY_INTERVAL:-2}"
 
 wait_for_database() {
-    echo "🔍 Attente de la disponibilité de la base de données..."
-    echo "   Host: $DB_HOST"
-    echo "   Port: $DB_PORT"
-    echo "   User: $DB_USER"
-
     local retry_count=0
 
     while ! pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" > /dev/null 2>&1; do
         retry_count=$((retry_count + 1))
 
         if [ $retry_count -gt $MAX_RETRIES ]; then
-            echo "❌ Impossible de se connecter à la base de données après $MAX_RETRIES tentatives"
-            echo "   Vérifiez que PostgreSQL est démarré et accessible"
+            echo "❌ Unable to connect to database after $MAX_RETRIES attempts"
+            echo "   Please verify that PostgreSQL is running and accessible"
             exit 1
         fi
 
-        echo "⏳ Tentative $retry_count/$MAX_RETRIES - Base de données non disponible, attente ${RETRY_INTERVAL}s..."
+        echo "⏳ Attempt $retry_count/$MAX_RETRIES - Database unavailable, waiting ${RETRY_INTERVAL}s..."
         sleep $RETRY_INTERVAL
     done
-
-    echo "✅ Base de données disponible !"
+    echo "✅ Database is available!"
 }
 
 run_migrations() {
-    echo "🚀 Vérification et exécution des migrations Alembic..."
-
+    echo "🚀 Verifying and running Alembic migrations..."
     if [ ! -f "alembic.ini" ]; then
-        echo "❌ Fichier alembic.ini non trouvé"
+        echo "❌ alembic.ini file not found"
         exit 1
     fi
 
-    echo "📋 Vérification de l'état des migrations..."
-    if ! alembic current > /dev/null 2>&1; then
-        echo "⚠️  Aucune migration trouvée, initialisation..."
-        if ! alembic stamp head > /dev/null 2>&1; then
-            echo "❌ Impossible d'initialiser Alembic"
-            exit 1
-        fi
+    if [ ! -d "migrations" ]; then
+        echo "❌ migrations directory not found"
+        exit 1
     fi
 
-    echo "⬆️  Application des migrations..."
+    echo "⬆️  Applying migrations..."
     if ! alembic upgrade head; then
-        echo "❌ Échec de l'application des migrations"
-        echo "   Vérifiez les logs ci-dessus pour plus de détails"
+        echo "❌ Failed to apply migrations"
+        echo "   Check the logs above for more details"
         exit 1
     fi
 
-    echo "✅ Migrations appliquées avec succès !"
-    echo "📊 État final des migrations :"
-    alembic current
+    echo "✅ Migrations applied successfully!"
 }
 
+# Function to start the API
 start_api() {
-    echo "🚀 Démarrage de l'API FastAPI..."
-    echo "   Host: $API_HOST"
-    echo "   Port: $API_PORT"
-    echo "   Workers: ${WORKERS:-1}"
-    echo "   Log Level: ${LOG_LEVEL:-info}"
-
     exec uvicorn --host "$API_HOST" \
         --port "$API_PORT" api.main:app \
         --workers ${WORKERS:-1} \
         --log-level ${LOG_LEVEL:-info}
 }
 
+# Function to start the listener
 start_listener() {
-    echo "🎧 Démarrage du service Listener..."
     wait_for_database
-
-    echo "✅ Démarrage du listener..."
     exec python3 listener/main.py
 }
 
+# Main script
 main() {
-    echo "================================================"
-    echo "🐳 Démarrage du conteneur - Mode: $APP"
-    echo "================================================"
+    echo "🐳 Starting container - Mode: $APP"
 
     case "${APP,,}" in
         "api")
-            echo "===== MODE API ====="
             wait_for_database
             run_migrations
             start_api
             ;;
         "listener")
-            echo "===== MODE LISTENER ====="
             start_listener
             ;;
         *)
-            echo "❌ Mode d'application non reconnu: $APP"
-            echo "   Modes disponibles: api, listener"
+            echo "❌ Unrecognized application mode: $APP"
+            echo "   Available modes: api, listener"
             exit 1
             ;;
     esac
 }
 
-trap 'echo "🛑 Arrêt du service..."; exit 0' SIGTERM SIGINT
+trap 'echo "🛑 Stopping service..."; exit 0' SIGTERM SIGINT
 main "$@"

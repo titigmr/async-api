@@ -24,8 +24,8 @@ class QueueSender:
             raise QueueSenderError(msg)
         await connection.close()
 
-    async def send_task_to_queue(self, queue: str, task_data: QueueTask, service: str):
-        await self.send_task_to_queue_retry(queue, task_data, service, 0)
+    async def send_task_to_queue(self, queue: str, task_data: QueueTask, service: str) -> None:
+        await self.send_task_to_queue_retry(queue=queue, task_data=task_data, service=service, retry=0)
 
     async def send_task_to_queue_retry(
         self,
@@ -33,16 +33,16 @@ class QueueSender:
         task_data: QueueTask,
         service: str,
         retry: int,
-    ):
+    ) -> None:
         try:
             connection = await aio_pika.connect_robust(self.broker_url)
             async with connection:
                 channel = await connection.channel()
-                await channel.declare_queue(queue, durable=True)
+                await channel.declare_queue(name=queue, durable=True)
                 pika_message = aio_pika.Message(
                     body=json.dumps(task_data.model_dump()).encode(),
                 )
-                await channel.default_exchange.publish(pika_message, routing_key=queue)
+                await channel.default_exchange.publish(message=pika_message, routing_key=queue)
                 logger.debug(f"Task send successfully on queue '{queue}'.")
 
         except Exception as e:
@@ -53,10 +53,10 @@ class QueueSender:
                 )
                 await asyncio.sleep(wait_time)
                 await self.send_task_to_queue_retry(
-                    queue,
-                    task_data,
-                    service,
-                    retry + 1,
+                    queue=queue,
+                    task_data=task_data,
+                    service=service,
+                    retry=retry + 1,
                 )
                 return
             logger.debug("No more retries")

@@ -46,11 +46,13 @@ class QueueListener:
     def message_handler(self, service_name: str):
         async def inner_message_handler(message: AbstractIncomingMessage) -> None:
             # Non blocking message processing (another task is created)
+            logger.debug(f"New task created for service '{service_name}'. Active tasks: {len(self.consumer_task)}")
             task = asyncio.create_task(
                 self.process_message(message=message, service_name=service_name),
                 context=Context(),
             )
             self.consumer_task.append(task)
+            task.add_done_callback(self.task_done_callback)
 
         return inner_message_handler
 

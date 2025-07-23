@@ -10,10 +10,8 @@ if TYPE_CHECKING:
 
 
 async def main() -> None:
-    logger.info("----------------------------")
     logger.info("🚀 Starting the listener")
-    logger.info("----------------------------")
-    container = DIContainer(Settings())
+    container = DIContainer(settings=Settings())
     app: QueueListener = container.app()
     await app.start()
     logger.info("Listener stopped.")

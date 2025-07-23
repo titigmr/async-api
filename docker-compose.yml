@@ -13,7 +13,7 @@ services:
     ports:
     - "8000:8000"
     depends_on:
-    - db
+    #- db
     - broker
     env_file:
     - .env.example
@@ -26,7 +26,6 @@ services:
       - ${PWD}/api:/app/api
       - ${PWD}/listener:/app/listener
       - ${PWD}/config:/app/config
-      - ${PWD}/migrations:/app/migrations
     build:
       context: .
       dockerfile: Dockerfile.dev
