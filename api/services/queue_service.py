@@ -4,7 +4,7 @@ import json
 import aio_pika
 
 from api.core.config import settings
-from api.logging_config import logger
+from api.core.logger import logger
 from api.schemas import QueueTask
 
 
@@ -13,7 +13,7 @@ class QueueSenderError(Exception):
 
 
 class QueueSender:
-    def __init__(self):
+    def __init__(self) -> None:
         self.broker_url = settings.BROKER_URL
         self.max_retries = settings.API_SENDER_RETRY
 

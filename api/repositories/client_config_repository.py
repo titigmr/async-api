@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from api.logging_config import logger
+from api.core.logger import logger
 
 
 class ClientAuthorization:

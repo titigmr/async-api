@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.core.database import get_db_session
-from api.logging_config import logger
+from api.core.logger import logger
 from api.schemas import HealthResponse, ReadyComponent, ReadyResponse
 from api.services.queue_service import QueueSender
 

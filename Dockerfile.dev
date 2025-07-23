@@ -3,7 +3,7 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest uv /usr/local/bin/uv
 # No optim... just for local devs.
 RUN apt-get update -y
-RUN apt-get install -y npm
+RUN apt-get install -y npm postgresql-client
 RUN npm install -g nodemon
 
 COPY pyproject.toml .
@@ -12,8 +12,6 @@ COPY api api
 COPY listener listener
 COPY migration migration
 COPY alembic.ini .
-COPY scripts scripts
-COPY scripts/run_migrations.py /app
 COPY scripts/entrypoint_dev.sh /app/entrypoint.sh
 ENV PATH=/app/.venv/bin/:$PATH
 ENV PYTHONPATH=/app

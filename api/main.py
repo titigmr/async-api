@@ -1,13 +1,11 @@
 # Configuration des logs en premier pour intercepter uvicorn
 from fastapi import FastAPI
-from sqlalchemy import create_engine
 
 from api.api.v1.routes import metrics, services, status, tasks
 from api.core.config import settings
-from api.core.database import Base
 from api.core.exception_handlers import register_exception_handlers
+from api.core.logger import logger
 from api.core.utils import get_version
-from api.logging_config import logger
 from api.repositories.client_config_repository import ClientConfigRepository
 from api.repositories.services_config_repository import ServicesConfigRepository
 
@@ -48,6 +46,3 @@ app.include_router(router=metrics.router, prefix="/internal", tags=["Metrics"])
 app.include_router(router=status.router, prefix="/internal", tags=["Status"])
 logger.info("🤗 Done.")
 logger.info("----------------------------")
-
-# Create the database tables if they do not exist
-Base.metadata.create_all(bind=create_engine(settings.DATABASE_URL.replace("+asyncpg", ""), echo=True))

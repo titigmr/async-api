@@ -29,7 +29,7 @@ install: install-uv ## Installation de l'environnement pour du développement lo
 		echo "Dépendances déjà synchronisées (suppose .venv existant)"; \
 	fi
 
-install-uv: ## Installe uv si nécessaire
+install-uv: ## Installe uv
 	@if ! command -v uv >/dev/null 2>&1; then \
 		echo "uv non trouvé, installation..."; \
 		curl -LsSf https://astral.sh/uv/install.sh | sh; \
@@ -67,9 +67,6 @@ logs-listener: ## Affiche les logs du conteneur listener
 logs-consumer: ## Affiche les logs du conteneur consumer JS
 	docker compose logs -f consumer
 
-logs-worker-python: ## Affiche les logs du worker Python
-	docker compose logs -f worker-python
-
 logs-db: ## Affiche les logs de la base de données
 	docker compose logs -f db
 
@@ -87,24 +84,21 @@ build-consumer: ## Lance la construction de l'image Docker consumer JS
 build-worker-python: ## Lance la construction de l'image Docker worker Python
 	docker compose build worker-python
 
-migrate: ## Applique les migrations de base de données
-	docker compose exec api python3 scripts/run_migrations.py
-
-stamp-db: ## Change le pointeur alembic à une révision particulière
+migration-stamp-db: ## Change le pointeur alembic à une révision particulière
 	@read -p "ID de la révision : " revision; \
 	docker compose exec api alembic stamp $$revision
 
-list-revision: ## Liste les révisions de la base de données
+migration-list-revision: ## Liste les révisions de la base de données
 	docker compose exec api alembic history
 
-upgrade-revision: ## Crée une nouvelle révision de base de données
+migration-upgrade-revision: ## Crée une nouvelle révision de base de données
 	@read -p "Message de révision : " msg; \
 	docker compose exec api alembic revision --autogenerate -m "$$msg"
 
 test: ## Lance les tests avec pytest
 	uv run pytest -v
 
-test-specific: ## Lance un test spécifique (ex: make test-specific FILE=tests/api/repositories/test_task_repository.py)
+test-specific: ## Lance un test (ex: make test-specific FILE=tests/api/repositories/test_task_repository.py)
 	uv run pytest -v $(FILE)
 
 coverage: ## Lance les tests avec couverture de code
@@ -117,13 +111,13 @@ clean: ## Nettoyage du dépôt
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
-clean-cache: ## Nettoyage du cache Docker et des volumes
+clean-docker: ## Nettoyage du cache Docker et des volumes
 	docker system prune -f
 	docker volume prune -f
 	docker image prune -f
 	docker builder prune -f
 
-clean-all: clean clean-cache ## Nettoyage complet (dépôt + cache Docker)
+clean-all: clean clean-docker ## Nettoyage complet (dépôt + cache Docker)
 
 restart: down up ## Redémarre tous les services
 
@@ -135,12 +129,6 @@ restart-listener: ## Redémarre uniquement le listener
 
 restart-consumer: ## Redémarre uniquement le consumer JS
 	docker compose restart consumer
-
-restart-worker-python: ## Redémarre uniquement le worker Python
-	docker compose restart worker-python
-
-ps: ## Affiche le statut des conteneurs
-	docker compose ps
 
 exec-api: ## Ouvre un shell dans le conteneur API
 	docker compose exec api bash

@@ -17,7 +17,7 @@ class QueueListener:
         service_repository: ServicesConfigRepository,
         rabbitmq_url: str,
         concurrency: int = 20,
-    ):
+    ) -> None:
         self.service_repository = service_repository
         self.rabbit_url = rabbitmq_url
         self.message_service = message_service
@@ -30,7 +30,7 @@ class QueueListener:
         self,
         message: AbstractIncomingMessage,
         service_name: str,
-    ):
+    ) -> None:
         async with message.process():
             try:  # auto-ack à la fin du bloc
                 await self.message_service.process(
@@ -40,8 +40,11 @@ class QueueListener:
             except MessageServiceError as e:
                 logger.error(f"Error: {e}")
 
+    def task_done_callback(self, task: asyncio.Task) -> None:
+        self.consumer_task.remove(task)
+
     def message_handler(self, service_name: str):
-        async def inner_message_handler(message: AbstractIncomingMessage):
+        async def inner_message_handler(message: AbstractIncomingMessage) -> None:
             # Non blocking message processing (another task is created)
             task = asyncio.create_task(
                 self.process_message(message=message, service_name=service_name),
@@ -62,7 +65,7 @@ class QueueListener:
                 logger.error(f"Connection failure : {e}. Retry in 5s...")
                 await asyncio.sleep(5)
 
-    async def start(self):
+    async def start(self) -> None:
         logger.info("----------------------------")
         logger.info(
             f"⏳ Connecting to the output queues (concurrency: {self.concurrency})...",
@@ -76,8 +79,8 @@ class QueueListener:
             logger.info(
                 f"- Listen service '{service.name}' on response queue '{service.out_queue}'",
             )
-            queue = await channel.declare_queue(service.out_queue, durable=True)
-            await queue.consume(self.message_handler(service.name))
+            queue = await channel.declare_queue(name=service.out_queue, durable=True)
+            await queue.consume(callback=self.message_handler(service_name=service.name))
         logger.info("🤗 Done.")
 
         # Setup signal handler
