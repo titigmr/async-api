@@ -19,13 +19,11 @@ class InterceptHandler(logging.Handler):
     """Handler pour intercepter les logs du module logging standard et les rediriger vers loguru"""
 
     def emit(self, record) -> None:
-        # Récupère le niveau correspondant de loguru
         try:
             level = loguru_logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
 
-        # Trouve le frame du caller
         frame, depth = logging.currentframe(), 2
         while frame and frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
@@ -55,10 +53,7 @@ def configure_logger(log_level: str = "INFO") -> None:
         filter=lambda record: record["extra"].update(task_name=get_task_name()) or True,
     )
 
-    # Intercepte tous les logs du module logging standard
     logging.basicConfig(handlers=[InterceptHandler()], level=0)
-
-    # Configure spécifiquement les loggers qui pourraient être utilisés
     loggers_to_intercept = [
         "",
         "aio_pika",
@@ -72,5 +67,4 @@ def configure_logger(log_level: str = "INFO") -> None:
         logging_logger.propagate = False
 
 
-# Exporte le logger configuré (sera configuré par le DI container)
 logger = loguru_logger

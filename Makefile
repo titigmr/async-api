@@ -73,7 +73,7 @@ logs-db: ## Affiche les logs de la base de données
 logs-rabbitmq: ## Affiche les logs de RabbitMQ
 	docker compose logs -f broker
 
-build: build-api build-consumer build-worker-python ## Lance la construction de toutes les images Docker
+build: build-api build-consumer build-listener ## Lance la construction de toutes les images Docker
 
 build-api: ## Lance la construction de l'image Docker API
 	docker compose build api
@@ -81,7 +81,7 @@ build-api: ## Lance la construction de l'image Docker API
 build-consumer: ## Lance la construction de l'image Docker consumer JS
 	docker compose build consumer
 
-build-worker-python: ## Lance la construction de l'image Docker worker Python
+build-listener: ## Lance la construction de l'image Docker du listener de l'api
 	docker compose build worker-python
 
 migration-stamp-db: ## Change le pointeur alembic à une révision particulière
@@ -117,16 +117,6 @@ clean: ## Nettoyage du dépôt
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
-clean-docker: ## Nettoyage du cache Docker et des volumes
-	docker system prune -f
-	docker volume prune -f
-	docker image prune -f
-	docker builder prune -f
-
-clean-all: clean clean-docker ## Nettoyage complet (dépôt + cache Docker)
-
-restart: down up ## Redémarre tous les services
-
 restart-api: ## Redémarre uniquement l'API
 	docker compose restart api
 
@@ -142,11 +132,9 @@ exec-api: ## Ouvre un shell dans le conteneur API
 exec-db: ## Ouvre un shell dans le conteneur PostgreSQL
 	docker compose exec db psql -U postgres -d tasks
 
-rabbitmq-ui: ## Ouvre l'interface web de RabbitMQ
+info: ## Ouvre l'interface web de RabbitMQ
 	@echo "Interface RabbitMQ disponible sur: http://localhost:15672"
 	@echo "Login: kalo / Password: kalo"
-
-api-docs: ## Ouvre la documentation API
 	@echo "Documentation API disponible sur: http://localhost:8000/docs"
 
 health-check: ## Vérifie la santé des services

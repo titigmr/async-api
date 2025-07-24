@@ -1,0 +1,57 @@
+{{ if .Capabilities.APIVersions.Has "keda.sh/v1alpha1" -}}
+{{- if .Values.worker.kedaAutoscaler.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "helper.fullname" . }}-scaledobject
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "helper.name" . }}
+    helm.sh/chart: {{ include "helper.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  scaleTargetRef:
+    name: {{ include "helper.fullname" . }}-worker
+    kind: {{ default "Deployment" .Values.worker.kedaAutoscaler.scaleTargetKind }}
+    apiVersion: {{ default "apps/v1" .Values.worker.kedaAutoscaler.scaleTargetApiVersion }}
+  minReplicaCount: {{ .Values.worker.kedaAutoscaler.minReplicaCount }}
+  maxReplicaCount: {{ .Values.worker.kedaAutoscaler.maxReplicaCount }}
+{{- if .Values.worker.kedaAutoscaler.idleReplicaCount }}
+  idleReplicaCount: {{ .Values.worker.kedaAutoscaler.idleReplicaCount }}
+{{- end }}
+{{- if .Values.worker.kedaAutoscaler.pollingInterval }}
+  pollingInterval: {{ .Values.worker.kedaAutoscaler.pollingInterval }}
+{{- end }}
+{{- if .Values.worker.kedaAutoscaler.cooldownPeriod }}
+  cooldownPeriod: {{ .Values.worker.kedaAutoscaler.cooldownPeriod }}
+{{- end }}
+{{- if .Values.worker.kedaAutoscaler.fallback }}
+  fallback:
+    failureThreshold: {{ .Values.worker.kedaAutoscaler.fallback.failureThreshold }}
+    replicas: {{ .Values.worker.kedaAutoscaler.fallback.replicas }}
+{{- end }}
+{{- if .Values.worker.kedaAutoscaler.behavior }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+      {{- with .Values.worker.kedaAutoscaler.behavior }}
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+  {{- end }}
+  triggers:
+    - type: rabbitmq
+      metricType: AverageValue
+      metadata:
+        address: {{ tpl .Values.worker.kedaAutoscaler.rabbitmq.address . | quote }}
+        listName: {{ .Values.worker.kedaAutoscaler.rabbitmq.listName | quote }}
+        listLength: {{ .Values.worker.kedaAutoscaler.rabbitmq.listLength | quote }}
+        {{- if and .Values.worker.kedaAutoscaler.rabbitmq.password }}
+        password: {{ .Values.worker.kedaAutoscaler.rabbitmq.password | quote }}
+        {{ end }}
+      {{- if and .Values.worker.kedaAutoscaler.rabbitmq.secretRef .Values.worker.kedaAutoscaler.rabbitmq.secretKey }}
+      authenticationRef:
+        name: {{ include "helper.fullname" . }}-rabbitmq-auth
+      {{- end }}
+{{- end }}
+{{- end }}

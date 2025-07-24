@@ -2,16 +2,20 @@ import asyncio
 import logging
 import sys
 from typing import Any
-from worker import AsyncWorkerRunner, Infinite, OnShot, TaskInterface
+
 from loguru import logger
 
-#--------------------------------
+from worker import AsyncWorkerRunner, Infinite, TaskInterface
+
+
+# --------------------------------
 # L'implementation du worker est indépendante du système de logging
 # Dans notre exemple, nous voulons utiliser loguru, il nous faut donc
 # intercepter les logs du module logging standard et les rediriger vers loguru
-#--------------------------------
+# --------------------------------
 class InterceptHandler(logging.Handler):
     """Handler pour intercepter les logs du module logging standard et les rediriger vers loguru"""
+
     def emit(self, record: logging.LogRecord) -> None:
         try:
             level = logger.level(record.levelname).name
@@ -26,32 +30,34 @@ class InterceptHandler(logging.Handler):
             record.getMessage(),
         )
 
+
 logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 logger.remove()
-logger.add(sys.stdout,level="INFO")
+logger.add(sys.stdout, level="INFO")
 
 
-#-------------------------
+# -------------------------
 # Implémentation de la task
 # "utilisateur"
-#-------------------------
+# -------------------------
 class MyTask(TaskInterface):
     async def execute(self, incoming_message, progress) -> Any:
         task_id = incoming_message.task_id
-        body: dict[Any,Any] = incoming_message.body
-
-        if body["must_succeed"] == True:
+        body: dict[Any, Any] = incoming_message.body
+        logging.info("Task_id: {task_id}")
+        if body["must_succeed"]:
             time = body["sleep"]
             logger.info(f"Traitement en cours... ({time}s)")
-            await asyncio.sleep(time/3) # Facultatif
+            await asyncio.sleep(time / 3)  # Facultatif
             await progress(30.0)
-            await asyncio.sleep(time/3) # Facultatif
+            await asyncio.sleep(time / 3)  # Facultatif
             await progress(60.0)
-            await asyncio.sleep(time/3) # Facultatif
+            await asyncio.sleep(time / 3)  # Facultatif
         else:
             # Exception "fonctionnelle", le message ne sera pas retraité, la tâche aura le status failure
-            raise Exception("Argh") 
-        return { "hello": "world" } # Réponse
+            raise Exception("Argh")
+        return {"hello": "world"}  # Réponse
+
 
 async def main() -> None:
     logger.info("Launch")
@@ -59,14 +65,14 @@ async def main() -> None:
         # Rabbit mq connection
         "amqp://kalo:kalo@127.0.0.1:5672",
         # In out queues
-        "in_queue_python","out_queue_python",
-        lambda:  MyTask(),
-        Infinite(1), # or OnShot(), 
+        "in_queue_python",
+        "out_queue_python",
+        lambda: MyTask(),
+        Infinite(1),  # or OnShot(),
     )
     await runner.start()
     logger.info("Stopped.")
 
+
 if __name__ == "__main__":
     asyncio.run(main())
-
-

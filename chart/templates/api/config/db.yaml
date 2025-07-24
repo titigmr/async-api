@@ -1,0 +1,20 @@
+kind: Secret
+apiVersion: v1
+metadata:
+  name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}-connection
+  labels: {{- (include "helper.labels" (dict "root" . "componentName" "api")) | nindent 4 }}
+stringData:
+  DATABASE_URL: "postgresql+asyncpg://{{ .Values.api.config.database.username }}:{{ .Values.api.config.database.password }}@{{ .Values.api.config.database.host }}:{{ .Values.api.database.port }}/{{ .Values.api.config.database.name }}"
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}-config
+  labels: {{- (include "helper.labels" (dict "root" . "componentName" "api")) | nindent 4 }}
+data:
+  DATABASE_URL: {{ .Values.api.database.url | b64enc }}
+  SECRET_KEY: {{ .Values.api.secret.key | b64enc }}
+  DEBUG: {{ .Values.api.debug | toYaml | b64enc }} # Convert boolean to YAML and then encode
+# config/extra_secret.yaml
+kind

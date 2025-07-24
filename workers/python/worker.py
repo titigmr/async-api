@@ -1,76 +1,86 @@
-
 import asyncio
-from contextvars import Context
 import json
+import logging
 import signal
+from collections.abc import Awaitable, Callable
+from contextvars import Context
 from socket import gethostname
-from typing import Any, Awaitable, Callable, NewType
+from typing import Any
+
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage
-import logging
 
 logger = logging.getLogger(__name__)
 
-#--------------------------------------
+
+# --------------------------------------
 # User Interface
-#--------------------------------------
+# --------------------------------------
 class IncomingMessage:
-    def __init__(self, task_id: str, body: Any  ):
+    def __init__(self, task_id: str, body: Any):
         self.task_id = task_id
         self.body = body
+
 
 class TaskInterface:
     async def execute(self, _incoming_message: IncomingMessage, progress: Callable[[float], Awaitable]) -> Any:
         pass
 
-#--------------------------------------
+
+# --------------------------------------
 # Typed exceptions
-#--------------------------------------
+# --------------------------------------
 class SendException(Exception):
     pass
+
 
 class IncomingMessageException(Exception):
     pass
 
+
 class TaskException(Exception):
     pass
 
+
 class OnShot:
     pass
+
 
 class Infinite:
     def __init__(self, concurrency: int = 1):
         self.concurrency = concurrency
 
+
 type WorkerMode = OnShot | Infinite
 
-#--------------------------------------
-# Runner component
-#--------------------------------------
-class AsyncWorkerRunner:
 
-    def __init__(self, 
-                 amqp_url: str, 
-                 amqp_in_queue: str,
-                 amqp_out_queue: str,
-                 task_provider: Callable[[], TaskInterface ],
-                 worker_mode : WorkerMode,
-                 ) -> None:
+# --------------------------------------
+# Runner component
+# --------------------------------------
+class AsyncWorkerRunner:
+    def __init__(
+        self,
+        amqp_url: str,
+        amqp_in_queue: str,
+        amqp_out_queue: str,
+        task_provider: Callable[[], TaskInterface],
+        worker_mode: WorkerMode,
+    ) -> None:
         self.amqp_url = amqp_url
         self.amqp_in_queue = amqp_in_queue
         self.amqp_out_queue = amqp_out_queue
 
-        if isinstance(worker_mode,OnShot):
+        if isinstance(worker_mode, OnShot):
             self.one_shot = True
             self.nbr_async_task = 1
-        if isinstance(worker_mode,Infinite):
+        if isinstance(worker_mode, Infinite):
             self.one_shot = False
-            self.nbr_async_task = worker_mode.concurrency   
+            self.nbr_async_task = worker_mode.concurrency
 
         self.consumer_task: list[asyncio.Task] = []
         self.stop_event = asyncio.Event()
         self.task_provider = task_provider
-        
+
     async def start(self) -> None:
         logger.info("🛜 Connecting to rabbitmq...")
         connection = await self.wait_for_connection()
@@ -97,7 +107,7 @@ class AsyncWorkerRunner:
     def task_done_callback(self, task):
         self.consumer_task.remove(task)
 
-    async def message_handler(self,message: AbstractIncomingMessage):
+    async def message_handler(self, message: AbstractIncomingMessage):
         # Non blocking message processing (another task is created)
         task = asyncio.create_task(
             self.process_message(message),
@@ -109,24 +119,24 @@ class AsyncWorkerRunner:
 
     @staticmethod
     def remove_new_line(message: str):
-        return message.replace('\r', '').replace('\n', '')
+        return message.replace("\r", "").replace("\n", "")
 
-    def parse_incomming_message(self,message: str) -> IncomingMessage:
+    def parse_incomming_message(self, message: str) -> IncomingMessage:
         try:
             dict_body = json.loads(message)
-        except Exception as e:
-            raise IncomingMessageException(f"Invalid json format '{self.remove_new_line(message)}'") 
-        if not "task_id" in dict_body:
+        except Exception:
+            raise IncomingMessageException(f"Invalid json format '{self.remove_new_line(message)}'")
+        if "task_id" not in dict_body:
             raise IncomingMessageException(f"No task id in message '{self.remove_new_line(message)}'")
-        if (not "data" in dict_body) or (not isinstance(dict_body["data"], dict)):
+        if ("data" not in dict_body) or (not isinstance(dict_body["data"], dict)):
             raise IncomingMessageException(f"No valid data field in '{self.remove_new_line(message)}'")
-        if not "body" in dict_body["data"]:
+        if "body" not in dict_body["data"]:
             raise IncomingMessageException(f"No data.body field in '{self.remove_new_line(message)}'")
-        return IncomingMessage(task_id=dict_body["task_id"],body=dict_body["data"]["body"])
+        return IncomingMessage(task_id=dict_body["task_id"], body=dict_body["data"]["body"])
 
     async def process_message(self, message: AbstractIncomingMessage):
         task_id = None
-        try:            
+        try:
             str_body = message.body.decode()
             incoming_message = self.parse_incomming_message(str_body)
             task_id = incoming_message.task_id
@@ -135,16 +145,17 @@ class AsyncWorkerRunner:
             result = None
             try:
                 task = self.task_provider()
+
                 async def progress_callback(progress: float):
                     try:
                         await self.send_progress_message(task_id=task_id, progress=progress)
-                    except SendException as e :
+                    except SendException:
                         logger.info("Impossible d'envoyer le progress... {e}")
-                    
+
                 result = await task.execute(incoming_message, progress_callback)
             except Exception as e:
                 raise TaskException(e)
-            
+
             await self.send_sucess_message(task_id, result)
             await message.ack()
         except IncomingMessageException as e:
@@ -154,76 +165,76 @@ class AsyncWorkerRunner:
         except SendException as e:
             # Impossible d'envoyer les messages de réponse... on nack implicite
             logger.info(f"Unable to send message: {e}")
-        except asyncio.CancelledError as e:
+        except asyncio.CancelledError:
             # Sigterm ou SigInt en plein traitement... on nack implicite
-            logger.info(f"Sigterm or SigInt, auto nack message")
+            logger.info("Sigterm or SigInt, auto nack message")
         except TaskException as e:
             logger.info(f"Fonctional error: {e}")
             try:
-                await self.send_failure_message(task_id, str(e)) # type: ignore
+                await self.send_failure_message(task_id, str(e))  # type: ignore
                 await message.ack()
             except SendException as e:
                 # Impossible d'envoyer les messages de réponse... on nack implicite
-                logger.info(f"Unable to send message...")
+                logger.info("Unable to send message...")
         if self.one_shot:
             self.stop()
-    
+
     async def send_start_message(self, task_id: str) -> None:
         try:
             message = {
-                "task_id" : task_id,
-                "data" : {
-                    "message_type" : "started",
-                    "hostname" : gethostname()
-                }
+                "task_id": task_id,
+                "data": {
+                    "message_type": "started",
+                    "hostname": gethostname(),
+                },
             }
             json_encoded = json.dumps(message).encode()
-            await self.send_message(json_encoded) 
+            await self.send_message(json_encoded)
         except Exception as e:
             raise SendException(e)
-    
+
     async def send_sucess_message(self, task_id: str, result: Any) -> None:
         try:
             message = {
-                "task_id" : task_id,
-                "data" : {
-                    "message_type" : "success",
-                    "response" : result,
-                }
+                "task_id": task_id,
+                "data": {
+                    "message_type": "success",
+                    "response": result,
+                },
             }
             json_encoded = json.dumps(message).encode()
-            await self.send_message(json_encoded) 
+            await self.send_message(json_encoded)
         except Exception as e:
             raise SendException(e)
 
     async def send_progress_message(self, task_id: str, progress: float) -> None:
         try:
             message = {
-                "task_id" : task_id,
-                "data" : {
-                    "message_type" : "progress",
-                    "progress" : progress,
-                }
+                "task_id": task_id,
+                "data": {
+                    "message_type": "progress",
+                    "progress": progress,
+                },
             }
             json_encoded = json.dumps(message).encode()
-            await self.send_message(json_encoded) 
+            await self.send_message(json_encoded)
         except Exception as e:
             raise SendException(e)
-        
+
     async def send_failure_message(self, task_id: str, error_message: str) -> None:
         try:
             message = {
-                "task_id" : task_id,
-                "data" : {
-                    "message_type" : "failure",
-                    "error_message" : error_message,
-                }
+                "task_id": task_id,
+                "data": {
+                    "message_type": "failure",
+                    "error_message": error_message,
+                },
             }
             json_encoded = json.dumps(message).encode()
-            await self.send_message(json_encoded) 
+            await self.send_message(json_encoded)
         except Exception as e:
             raise SendException(e)
-        
+
     async def send_message(self, message: bytes):
         connection = await self.wait_for_connection()
         channel = await connection.channel()
@@ -245,4 +256,3 @@ class AsyncWorkerRunner:
             except Exception as e:
                 logger.info(f"Connection failure : {e}. Retry in 5s...")
                 await asyncio.sleep(5)
-

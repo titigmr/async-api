@@ -1,0 +1,196 @@
+{{- if not .Values.api.statefulset }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
+  labels: {{- (include "helper.labels" (dict "root" . "componentName" "api")) | nindent 4 }}
+spec:
+  {{- if not .Values.api.autoscaling.enabled }}
+  replicas: {{ .Values.api.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: {{ .Values.api.revisionHistoryLimit | default 10 }}
+  selector:
+    matchLabels: {{- include "helper.selectorLabels" (dict "root" . "componentName" "api") | nindent 6 }}
+  strategy:
+    type: {{ .Values.api.strategy.type }}
+    {{- if eq .Values.api.strategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.api.strategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.api.strategy.rollingUpdate.maxSurge }}
+    {{- end }}
+  template:
+    metadata:
+      {{- if or .Values.api.podAnnotations .Values.api.secrets .Values.api.env .Values.global.env .Values.global.secrets }}
+      annotations:
+        {{- include "helper.checksum" (list $ "/api/configmap.yaml") | nindent 8 }}
+        {{- include "helper.checksum" (list $ "/api/secret.yaml") | nindent 8 }}
+        {{- if .Values.api.podAnnotations }}
+        {{- toYaml .Values.api.podAnnotations | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      labels: {{- include "helper.labels" (dict "root" . "componentName" "api") | nindent 8 }}
+        {{- if .Values.api.podLabels }}
+        {{- toYaml .Values.api.podLabels | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .Values.api.imagePullSecrets }}
+      imagePullSecrets:
+      {{- range .Values.api.imagePullSecrets }}
+      - name: {{ .name }}
+      {{- end }}
+      {{- end }}
+      {{- if (get .Values "api").serviceAccount.enabled }}
+      serviceAccountName: {{ .Values.api.serviceAccount.name | default (printf "%s-%s" (include "helper.fullname" .) "api") }}
+      {{- end }}
+      {{- if .Values.api.podSecurityContext }}
+      securityContext: {{- toYaml .Values.api.podSecurityContext | nindent 8 }}
+      {{- end }}
+      {{- if .Values.api.initContainers }}
+      initContainers: {{- tpl (toYaml .Values.api.initContainers) . | nindent 6 }}
+      {{- end }}
+      containers:
+      - name: listener
+        {{- if .Values.api.securityContext }}
+        securityContext: {{- toYaml .Values.api.securityContext | nindent 10 }}
+        {{- end }}
+        image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+        {{- if .Values.api.listener.command }}
+        command: 
+        {{- range .Values.api.listener.command }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.api.listener.args }}
+        args:
+        {{- range .Values.api.listener.args }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        env:
+        - name: APP
+          value: listener
+        {{- if or .Values.api.listener.env .Values.global.env .Values.global.secrets .Values.global.secrets .Values.api.listener.envFrom }}
+        envFrom:
+        {{- if or .Values.api.listener.env .Values.global.env }}
+        - configMapRef:
+            name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
+        {{- end }}
+        {{- if or .Values.api.listener.secrets .Values.global.secrets }}
+        - secretRef:
+            name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
+        {{- end }}
+        {{- if .Values.api.listener.envFrom }}
+          {{- toYaml .Values.api.listener.envFrom | nindent 8 }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.api.listener.probes.startupProbe }}
+        startupProbe:
+        {{- toYaml .Values.api.listener.probes.startupProbe | nindent 8 }}
+        {{- end }}
+        {{- if .Values.api.listener.probes.readinessProbe }}
+        readinessProbe:
+        {{- toYaml .Values.api.listener.probes.readinessProbe | nindent 8 }}
+        {{- end }}
+        {{- if .Values.api.listener.probes.livenessProbe }}
+        livenessProbe:
+        {{- toYaml .Values.api.listener.probes.livenessProbe }}
+        {{- end }}
+        resources: {{- toYaml .Values.api.listener.resources | nindent 10 }}
+        {{- if .Values.api.listener.volumeMounts }}
+        volumeMounts: {{- toYaml .Values.api.listener.volumeMounts | nindent 8 }}
+        {{- end }}
+      - name: api
+        {{- if .Values.api.securityContext }}
+        securityContext: {{- toYaml .Values.api.securityContext | nindent 10 }}
+        {{- end }}
+        image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+        {{- if .Values.api.command }}
+        command:
+        {{- range .Values.api.command }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.api.args }}
+        args:
+        {{- range .Values.api.args }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        ports:
+        - containerPort: {{ .Values.api.containerPort }}
+          protocol: TCP
+        {{- if .Values.api.extraPorts }}
+          {{- toYaml .Values.api.extraPorts | nindent 8 }}
+        {{- end }}
+        {{- if or .Values.api.env .Values.global.env .Values.global.secrets .Values.global.secrets .Values.api.envFrom }}
+        envFrom:
+        {{- if or .Values.api.env .Values.global.env }}
+        - configMapRef:
+            name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
+        {{- end }}
+        {{- if or .Values.api.secrets .Values.global.secrets }}
+        - secretRef:
+            name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
+        {{- end }}
+        {{- if .Values.api.envFrom }}
+          {{- toYaml .Values.api.envFrom | nindent 8 }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.api.probes.startupProbe.enabled }}
+        startupProbe:
+          httpGet:
+            path: {{ .Values.api.probes.healthcheck.path }}
+            port: {{ .Values.api.probes.healthcheck.port | default .Values.api.containerPort }}
+          initialDelaySeconds: {{ .Values.api.probes.startupProbe.initialDelaySeconds }}
+          successThreshold: {{ .Values.api.probes.startupProbe.successThreshold }}
+          failureThreshold: {{ .Values.api.probes.startupProbe.failureThreshold }}
+          periodSeconds: {{ .Values.api.probes.startupProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.api.probes.startupProbe.timeoutSeconds }}
+        {{- end }}
+        {{- if .Values.api.probes.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.api.probes.healthcheck.path }}
+            port: {{ .Values.api.probes.healthcheck.port | default .Values.api.containerPort }}
+          initialDelaySeconds: {{ .Values.api.probes.readinessProbe.initialDelaySeconds }}
+          successThreshold: {{ .Values.api.probes.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.api.probes.readinessProbe.failureThreshold }}
+          periodSeconds: {{ .Values.api.probes.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.api.probes.readinessProbe.timeoutSeconds }}
+        {{- end }}
+        {{- if .Values.api.probes.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.api.probes.healthcheck.path }}
+            port: {{ .Values.api.probes.healthcheck.port | default .Values.api.containerPort }}
+          initialDelaySeconds: {{ .Values.api.probes.livenessProbe.initialDelaySeconds }}
+          successThreshold: {{ .Values.api.probes.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.api.probes.livenessProbe.failureThreshold }}
+          periodSeconds: {{ .Values.api.probes.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.api.probes.livenessProbe.timeoutSeconds }}
+        {{- end }}
+        resources: {{- toYaml .Values.api.resources | nindent 10 }}
+        {{- if .Values.api.volumeMounts }}
+        volumeMounts: {{- toYaml .Values.api.volumeMounts | nindent 8 }}
+        {{- end }}
+      {{- if .Values.api.extraContainers }}
+        {{- tpl (toYaml .Values.api.extraContainers) . | nindent 6 }}
+      {{- end }}
+      {{- if .Values.api.hostAliases }}
+      hostAliases: {{- toYaml .Values.api.hostAliases | nindent 6 }}
+      {{- end }}
+      {{- if .Values.api.nodeSelector }}
+      nodeSelector: {{- toYaml .Values.api.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.api.affinity }}
+      affinity: {{- toYaml .Values.api.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .Values.api.tolerations }}
+      tolerations: {{- toYaml .Values.api.tolerations | nindent 6 }}
+      {{- end }}
+      {{- if .Values.api.volumes }}
+      volumes: {{- toYaml .Values.api.volumes | nindent 6 }}
+      {{- end }}
+{{- end }}

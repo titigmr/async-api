@@ -1,0 +1,23 @@
+apiVersion: v2
+name: taskapi
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+description: A Helm chart to deploy TaskApi.
+deprecated: false
+annotations: {}
+keywords: []
+dependencies:
+- name: rabbitmq
+  repository: https://charts.bitnami.com/bitnami
+  version: ">=16.0.11"
+  condition: rabbitmq.enabled
+- name: postgresql
+  repository: "https://charts.bitnami.com/bitnami"
+  version: ">16.6.3"
+  condition: postgresql.enabled
+sources:
+- https://github.com/titigmr/async-api
+maintainers:
+ - name: titigmr
+   url: https://github.com/titigmr
