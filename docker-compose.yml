@@ -17,7 +17,7 @@ services:
     #- db
     - broker
     env_file:
-    - .env
+    - .env.example
     environment:
       - APP=api
   listener:
@@ -35,7 +35,7 @@ services:
     - db
     - broker
     env_file:
-    - .env
+    -  .env.example
     environment:
       - APP=listener
   consumer:
@@ -50,13 +50,13 @@ services:
       - db
       - broker
     env_file:
-      - .env
+      -  .env.example
   db:
     image: postgres:17
     volumes:
       - db-data:/var/lib/postgresql/data
     env_file:
-      - .env
+      -  .env.example
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

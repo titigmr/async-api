@@ -5,6 +5,7 @@ description = "Generic api for async tasks"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "loguru>=0.7.3",
     "aio-pika>=9.5.5",
 ]
 

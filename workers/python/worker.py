@@ -4,7 +4,7 @@ from contextvars import Context
 import json
 import signal
 from socket import gethostname
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, NewType
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage
 import logging
@@ -35,6 +35,15 @@ class IncomingMessageException(Exception):
 class TaskException(Exception):
     pass
 
+class OnShot:
+    pass
+
+class Infinite:
+    def __init__(self, concurrency: int = 1):
+        self.concurrency = concurrency
+
+type WorkerMode = OnShot | Infinite
+
 #--------------------------------------
 # Runner component
 #--------------------------------------
@@ -45,25 +54,32 @@ class AsyncWorkerRunner:
                  amqp_in_queue: str,
                  amqp_out_queue: str,
                  task_provider: Callable[[], TaskInterface ],
-                 one_shot: bool = True,
-                 nbr_async_task: int = 1,
+                 worker_mode : WorkerMode,
                  ) -> None:
         self.amqp_url = amqp_url
         self.amqp_in_queue = amqp_in_queue
         self.amqp_out_queue = amqp_out_queue
-        self.one_shot = one_shot
-        self.nbr_async_task = nbr_async_task
+
+        if isinstance(worker_mode,OnShot):
+            self.one_shot = True
+            self.nbr_async_task = 1
+        if isinstance(worker_mode,Infinite):
+            self.one_shot = False
+            self.nbr_async_task = worker_mode.concurrency   
+
         self.consumer_task: list[asyncio.Task] = []
         self.stop_event = asyncio.Event()
         self.task_provider = task_provider
         
     async def start(self) -> None:
+        logger.info("🛜 Connecting to rabbitmq...")
         connection = await self.wait_for_connection()
         channel = await connection.channel()
         await channel.set_qos(prefetch_count=self.nbr_async_task)
         queue = await channel.declare_queue(self.amqp_in_queue, durable=True)
+        logger.info("🤗 Successfully connected..")
+
         await queue.consume(self.message_handler)
-        logger.info("🤗 Done.")
 
         # Setup signal handler
         loop = asyncio.get_running_loop()
@@ -90,19 +106,22 @@ class AsyncWorkerRunner:
         nbr_consumers = len(self.consumer_task)
         self.consumer_task.append(task)
         task.add_done_callback(self.task_done_callback)
-        logger.info(f"consumer_task len: {nbr_consumers}")
+
+    @staticmethod
+    def remove_new_line(message: str):
+        return message.replace('\r', '').replace('\n', '')
 
     def parse_incomming_message(self,message: str) -> IncomingMessage:
         try:
             dict_body = json.loads(message)
         except Exception as e:
-            raise IncomingMessageException(f"Invalid json format '{message}'") 
+            raise IncomingMessageException(f"Invalid json format '{self.remove_new_line(message)}'") 
         if not "task_id" in dict_body:
-            raise IncomingMessageException(f"No task id in message '{message}'")
+            raise IncomingMessageException(f"No task id in message '{self.remove_new_line(message)}'")
         if (not "data" in dict_body) or (not isinstance(dict_body["data"], dict)):
-            raise IncomingMessageException(f"No valid data field in '{message}'")
+            raise IncomingMessageException(f"No valid data field in '{self.remove_new_line(message)}'")
         if not "body" in dict_body["data"]:
-            raise IncomingMessageException(f"No data.body field in '{message}'")
+            raise IncomingMessageException(f"No data.body field in '{self.remove_new_line(message)}'")
         return IncomingMessage(task_id=dict_body["task_id"],body=dict_body["data"]["body"])
 
     async def process_message(self, message: AbstractIncomingMessage):
@@ -221,52 +240,9 @@ class AsyncWorkerRunner:
     async def wait_for_connection(self) -> aio_pika.RobustConnection:
         while True:
             try:
-                logger.info("Connecting to rabbitmq...")
                 connection = await aio_pika.connect_robust(self.amqp_url)
-                logger.info("Successfully connected.")
                 return connection  # type: ignore
             except Exception as e:
                 logger.info(f"Connection failure : {e}. Retry in 5s...")
                 await asyncio.sleep(5)
-
-#-------------------------
-# Usage
-#-------------------------
-class MyTask(TaskInterface):
-    async def execute(self, incoming_message, progress) -> Any:
-        task_id = incoming_message.task_id
-        body: dict[Any,Any] = incoming_message.body
-
-        if body["must_succeed"] == True:
-            time = body["sleep"]
-            logger.info(f"Traitement en cours... ({time}s)")
-            await asyncio.sleep(time/3)
-            await progress(30.0)
-            await asyncio.sleep(time/3)
-            await progress(60.0)
-            await asyncio.sleep(time/3)
-        else:
-            raise Exception("Argh") 
-        return { "hello": "world" }
-
-async def main() -> None:
-    logger.info("Launch")
-    runner = AsyncWorkerRunner(
-        # Rabbit mq connection
-        "amqp://kalo:kalo@127.0.0.1:5672",
-        # In out queues
-        "in_queue_python","out_queue_python",
-        lambda:  MyTask(),
-        True, 1)
-    await runner.start()
-    logger.info("Stopped.")
-
-if __name__ == "__main__":
-    logging.basicConfig(level= logging.INFO)
-    asyncio.run(main())
-
-
-
-# TODO: Oneshot -> nbr task == 1
-# Logger 
 
