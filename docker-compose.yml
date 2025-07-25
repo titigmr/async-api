@@ -14,7 +14,7 @@ services:
     ports:
     - "8000:8000"
     depends_on:
-    #- db
+    - db
     - broker
     env_file:
     - .env.example

@@ -56,7 +56,7 @@ spec:
         image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: {{ .Values.api.image.pullPolicy }}
         {{- if .Values.api.listener.command }}
-        command: 
+        command:
         {{- range .Values.api.listener.command }}
         - {{ . | quote }}
         {{- end }}
@@ -70,6 +70,34 @@ spec:
         env:
         - name: APP
           value: listener
+        {{- if include "chart.databaseUrl" . }}
+        - name: DATABASE_URL
+          {{- if .Values.database.fromSecret.name }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.fromSecret.name }}
+              key: {{ .Values.database.fromSecret.key | default "DATABASE_URL" }}
+          {{- else }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ printf "%s-%s-%s" (include "helper.fullname" .) "api" "connection" }}
+              key: DATABASE_URL
+          {{- end }}
+        {{- end }}
+        {{- if include "chart.brokerUrl" . }}
+        - name: BROKER_URL
+          {{- if .Values.broker.fromSecret.name }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.broker.fromSecret.name }}
+              key: {{ .Values.broker.fromSecret.key | default "BROKER_URL" }}
+          {{- else }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ printf "%s-%s-%s" (include "helper.fullname" .) "api" "connection" }}
+              key: BROKER_URL
+          {{- end }}
+        {{- end }}
         {{- if or .Values.api.listener.env .Values.global.env .Values.global.secrets .Values.global.secrets .Values.api.listener.envFrom }}
         envFrom:
         {{- if or .Values.api.listener.env .Values.global.env }}
@@ -117,6 +145,35 @@ spec:
         {{- range .Values.api.args }}
         - {{ . | quote }}
         {{- end }}
+        {{- end }}
+        env:
+        {{- if include "chart.databaseUrl" . }}
+        - name: DATABASE_URL
+          {{- if .Values.database.fromSecret.name }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.database.fromSecret.name }}
+              key: {{ .Values.database.fromSecret.key | default "DATABASE_URL" }}
+          {{- else }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ printf "%s-%s-%s" (include "helper.fullname" .) "api" "connection" }}
+              key: DATABASE_URL
+          {{- end }}
+        {{- end }}
+        {{- if include "chart.brokerUrl" . }}
+        - name: BROKER_URL
+          {{- if .Values.broker.fromSecret.name }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.broker.fromSecret.name }}
+              key: {{ .Values.broker.fromSecret.key | default "BROKER_URL" }}
+          {{- else }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ printf "%s-%s-%s" (include "helper.fullname" .) "api" "connection" }}
+              key: BROKER_URL
+          {{- end }}
         {{- end }}
         ports:
         - containerPort: {{ .Values.api.containerPort }}

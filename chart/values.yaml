@@ -4,6 +4,45 @@ nameOverride: ""
 # -- String to fully override the default application name.
 # @section -- General
 fullnameOverride: ""
+
+# Database connection configuration
+# @section -- Database
+database:
+  # -- Database connection configuration
+  # If host is empty, uses internal PostgreSQL service when postgresql.enabled=true
+  host: ""  # Leave empty to use internal PostgreSQL
+  # host: "external-postgres.company.com"  # For external database
+  port: 5432
+  database: ""  # Defaults to postgresql.auth.database
+  username: ""  # Defaults to postgresql.auth.username
+  password: ""  # Defaults to postgresql.auth.password
+  scheme: "postgresql+asyncpg"
+  # -- Complete database URL (overrides individual components above)
+  url: ""
+  # -- Load from existing secret
+  fromSecret: {}
+  #  name: "database-secret"
+  #  key: "DATABASE_URL"
+
+# Message broker connection configuration
+# @section -- Broker
+broker:
+  # -- Message broker connection configuration
+  # If host is empty, uses internal RabbitMQ service when rabbitmq.enabled=true
+  host: ""  # Leave empty to use internal RabbitMQ
+  # host: "external-rabbitmq.company.com"  # For external broker
+  port: 5672
+  username: ""  # Defaults to rabbitmq.auth.username
+  password: ""  # Defaults to rabbitmq.auth.password
+  scheme: "amqp"
+  vhost: "/"
+  # -- Complete broker URL (overrides individual components above)
+  url: ""
+  # -- Load from existing secret
+  fromSecret: {}
+  #  name: "broker-secret"
+  #  key: "BROKER_URL"
+
 global:
   # -- Map of environment variables to inject into all containers.
   # @section -- Global
@@ -61,33 +100,6 @@ api:
     # @ section -- Api.config
     # Configuration for the api.
     env: {}
-    # @ section -- Api.config
-    database:
-      # @ section -- Api.database
-      # -- Database configuration.
-      username: "postgres"
-      # username of the database user.
-      password: "postgres"
-      # password of the database user.
-      name: "tasks"
-      # name of the database.
-      host: "db"
-      # host of the database server.
-      port: 5432
-      # port of the database server.
-      # Us
-      fromSecret: {}
-      #  name: "database-secret"
-      #  key: "password"
-    broker:
-      username: "guest"
-      password: "guest"
-      name: "tasks"
-      host: "rabbitmq"
-      port: 5672
-      fromSecret: {}
-      #  name: "broker-secret"
-      #  key: "password"
 
   ingress:
     # -- Whether or not ingress should be enabled.
@@ -353,7 +365,7 @@ api:
     extraPorts: []
     # - port: 9090
     #   targetPort: 9090
-    #   protocol: "TCP" 
+    #   protocol: "TCP"
     #   name: "metrics"
   resources:
     requests:
@@ -684,6 +696,8 @@ extraObjects: []
 #       database: "keycloak"
 #       architecture: "standalone"
 
+
+
 worker:
   # -- Should the app run as a Job instead of a Deployment.
   # @section -- Worker
@@ -966,7 +980,7 @@ worker:
     extraPorts: []
     # - port: 9090
     #   targetPort: 9090
-    #   protocol: "TCP" 
+    #   protocol: "TCP"
     #   name: "metrics"
   resources:
     requests:
@@ -1222,3 +1236,580 @@ worker:
           # -- Prometheus ServiceMonitor tlsConfig.
           # @section -- Worker
           tlsConfig: {}
+
+# PostgreSQL configuration
+# @section -- PostgreSQL
+postgresql:
+  # -- Enable PostgreSQL subchart
+  enabled: true
+  # -- PostgreSQL architecture
+  architecture: standalone
+  # -- PostgreSQL authentication configuration
+  auth:
+    # -- PostgreSQL root user
+    postgresUser: postgres
+    # -- PostgreSQL root password (use existing secret or auto-generate)
+    postgresPassword: "postgres"
+    # -- PostgreSQL database name
+    database: "asynctask"
+    # -- PostgreSQL username for application
+    username: "asynctask"
+    # -- PostgreSQL password for application user
+    password: "asynctask123"
+    # -- Use existing secret for PostgreSQL passwords
+    existingSecret: ""
+  # -- PostgreSQL primary configuration
+  primary:
+    # -- PostgreSQL primary persistence configuration
+    persistence:
+      # -- Enable PostgreSQL primary persistence using PVC
+      enabled: true
+      # -- PostgreSQL primary persistence storage class
+      storageClass: ""
+      # -- PostgreSQL primary persistence access modes
+      accessModes:
+        - ReadWriteOnce
+      # -- PostgreSQL primary persistence size
+      size: 8Gi
+    # -- PostgreSQL primary resources
+    resources:
+      # -- PostgreSQL primary resource limits
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      # -- PostgreSQL primary resource requests
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    # -- PostgreSQL primary service configuration
+    service:
+      # -- PostgreSQL primary service type
+      type: ClusterIP
+      # -- PostgreSQL primary service port
+      ports:
+        postgresql: 5432
+  # -- PostgreSQL metrics configuration
+  metrics:
+    # -- Enable PostgreSQL metrics
+    enabled: false
+    # -- PostgreSQL metrics service monitor
+    serviceMonitor:
+      # -- Enable PostgreSQL metrics service monitor
+      enabled: false
+
+# RabbitMQ configuration
+# @section -- RabbitMQ
+rabbitmq:
+  # -- Enable RabbitMQ subchart
+  enabled: true
+  # -- RabbitMQ authentication configuration
+  auth:
+    # -- RabbitMQ root username
+    username: "kalo"
+    # -- RabbitMQ root password
+    password: "kalo"
+    # -- RabbitMQ erlang cookie
+    erlangCookie: "secretcookie"
+    # -- Use existing secret for RabbitMQ passwords
+    existingPasswordSecret: ""
+    # -- Use existing secret for RabbitMQ erlang cookie
+    existingErlangSecret: ""
+  # -- RabbitMQ clustering configuration
+  clustering:
+    # -- Enable RabbitMQ clustering
+    enabled: false
+    # -- RabbitMQ cluster formation discovery
+    addressType: hostname
+    # -- RabbitMQ cluster node count
+    replicaCount: 1
+  # -- RabbitMQ persistence configuration
+  persistence:
+    # -- Enable RabbitMQ persistence using PVC
+    enabled: true
+    # -- RabbitMQ persistence storage class
+    storageClass: ""
+    # -- RabbitMQ persistence access mode
+    accessMode: ReadWriteOnce
+    # -- RabbitMQ persistence size
+    size: 8Gi
+  # -- RabbitMQ resources
+  resources:
+    # -- RabbitMQ resource limits
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    # -- RabbitMQ resource requests
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  # -- RabbitMQ service configuration
+  service:
+    # -- RabbitMQ service type
+    type: ClusterIP
+    # -- RabbitMQ service ports
+    ports:
+      # -- RabbitMQ AMQP port
+      amqp: 5672
+      # -- RabbitMQ management UI port
+      manager: 15672
+  # -- RabbitMQ management plugin configuration
+  management:
+    # -- Enable RabbitMQ management plugin
+    enabled: true
+  # -- RabbitMQ metrics configuration
+  metrics:
+    # -- Enable RabbitMQ metrics
+    enabled: false
+    # -- RabbitMQ metrics service monitor
+    serviceMonitor:
+      # -- Enable RabbitMQ metrics service monitor
+      enabled: false
+
+# Workers configuration
+# @section -- Workers
+workers:
+  # -- Example worker demonstrating deployment with KEDA autoscaling
+  # @section -- Workers
+  - # -- Worker name (used for labeling and naming resources)
+    # @section -- Workers
+    name: example
+    # -- Worker type: 'deployment' for long-running processes, 'job' for one-time tasks
+    # @section -- Workers
+    type: deployment
+    # -- Enable/disable this worker
+    # @section -- Workers
+    enabled: true
+
+    # -- Job-specific configuration (only used when type=job)
+    # @section -- Workers
+    jobSpec: {}
+    # image:
+    #   repository: "your-registry/worker"
+    #   tag: "latest"
+    #   pullPolicy: IfNotPresent
+    # backoffLimit: 3
+    # activeDeadlineSeconds: 3600
+    # ttlSecondsAfterFinished: 100
+    # resources:
+    #   requests:
+    #     cpu: "100m"
+    #     memory: "128Mi"
+    #   limits:
+    #     cpu: "500m"
+    #     memory: "512Mi"
+    # env:
+    #   - name: WORKER_TYPE
+    #     value: "job-worker"
+    # envFromSecret: []
+    # envFromConfigMap: []
+    # securityContext:
+    #   runAsNonRoot: true
+    #   runAsUser: 1000
+
+    # -- Deployment-specific configuration (only used when type=deployment)
+    # @section -- Workers
+    deploymentSpec:
+      # -- Container image configuration
+      # @section -- Workers
+      image:
+        # -- Image repository
+        # @section -- Workers
+        repository: "github.com/titigmr/consumer"
+        # -- Image tag
+        # @section -- Workers
+        tag: "v0.1.0"
+        # -- Image pull policy
+        # @section -- Workers
+        pullPolicy: IfNotPresent
+
+      # -- Resource limits and requests
+      # @section -- Workers
+      resources:
+        requests:
+          # -- CPU request
+          # @section -- Workers
+          cpu: "100m"
+          # -- Memory request
+          # @section -- Workers
+          memory: "128Mi"
+        limits:
+          # -- CPU limit
+          # @section -- Workers
+          cpu: "500m"
+          # -- Memory limit
+          # @section -- Workers
+          memory: "512Mi"
+
+      # -- Environment variables as key-value pairs
+      # @section -- Workers
+      env:
+        - name: RABBITMQ_URL
+          value: "{{ include \"chart.brokerUrl\" . }}"
+        - name: DATABASE_URL
+          value: "{{ include \"chart.databaseUrl\" . }}"
+        - name: INPUT_QUEUE
+          value: "worker-tasks"
+        - name: OUTPUT_QUEUE
+          value: "worker-responses"
+        - name: WORKER_TYPE
+          value: "generic-worker"
+        - name: LOG_LEVEL
+          value: "INFO"
+
+      # -- Environment variables from secrets
+      # @section -- Workers
+      envFromSecret: []
+      # - secretRef:
+      #     name: worker-secret
+      # - secretRef:
+      #     name: database-secret
+      #     optional: true
+
+      # -- Environment variables from config maps
+      # @section -- Workers
+      envFromConfigMap: []
+      # - configMapRef:
+      #     name: worker-config
+      # - configMapRef:
+      #     name: shared-config
+      #     optional: true
+
+      # -- Number of replicas (ignored if KEDA autoscaling is enabled)
+      # @section -- Workers
+      replicas: 1
+
+      # -- Pod security context
+      # @section -- Workers
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      # -- Pod annotations
+      # @section -- Workers
+      podAnnotations: {}
+
+      # -- Pod labels
+      # @section -- Workers
+      podLabels: {}
+
+      # -- Node selector
+      # @section -- Workers
+      nodeSelector: {}
+
+      # -- Tolerations
+      # @section -- Workers
+      tolerations: []
+
+      # -- Affinity rules
+      # @section -- Workers
+      affinity: {}
+
+    # -- KEDA autoscaler configuration
+    # @section -- Workers
+    kedaAutoscaler:
+      # -- Enable KEDA autoscaling
+      # @section -- Workers
+      enabled: true
+      # -- Minimum number of replicas
+      # @section -- Workers
+      minReplicaCount: 1
+      # -- Maximum number of replicas
+      # @section -- Workers
+      maxReplicaCount: 10
+      # -- Number of replicas when no workload (0 to scale to zero)
+      # @section -- Workers
+      idleReplicaCount: 0
+      # -- Polling interval in seconds
+      # @section -- Workers
+      pollingInterval: 30
+      # -- Cooldown period in seconds
+      # @section -- Workers
+      cooldownPeriod: 300
+      # -- Target resource kind for scaling (Deployment, Job, etc.)
+      # @section -- Workers
+      scaleTargetKind: "Deployment"
+      # -- Target resource API version
+      # @section -- Workers
+      scaleTargetApiVersion: "apps/v1"
+
+      # -- RabbitMQ trigger configuration for KEDA
+      # @section -- Workers
+      rabbitmq:
+        # -- RabbitMQ connection string
+        # @section -- Workers
+        address: "{{ include \"chart.brokerUrl\" . }}"
+        # -- Queue name to monitor
+        # @section -- Workers
+        listName: "worker-tasks"
+        # -- Target queue length to trigger scaling
+        # @section -- Workers
+        listLength: "5"
+        # -- RabbitMQ password (if not using secretRef)
+        # @section -- Workers
+        password: ""
+        # -- Secret reference for RabbitMQ credentials
+        # @section -- Workers
+        secretRef: ""
+        # -- Secret key for RabbitMQ password
+        # @section -- Workers
+        secretKey: ""
+
+      # -- Advanced scaling behavior configuration
+      # @section -- Workers
+      behavior:
+        scaleDown:
+          # -- Stabilization window for scale down
+          # @section -- Workers
+          stabilizationWindowSeconds: 300
+          policies:
+          - type: Percent
+            value: 50
+            periodSeconds: 60
+        scaleUp:
+          # -- Stabilization window for scale up
+          # @section -- Workers
+          stabilizationWindowSeconds: 0
+          policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 15
+          - type: Pods
+            value: 4
+            periodSeconds: 15
+          selectPolicy: Max
+
+      # -- Fallback configuration when KEDA fails
+      # @section -- Workers
+      fallback:
+        # -- Number of failures before fallback
+        # @section -- Workers
+        failureThreshold: 3
+        # -- Number of replicas during fallback
+        # @section -- Workers
+        replicas: 2
+
+    # -- RBAC configuration
+    # @section -- Workers
+    role:
+      # -- Create ServiceAccount and RBAC resources
+      # @section -- Workers
+      create: true
+      # -- RBAC rules for the worker
+      # @section -- Workers
+      rules:
+        - apiGroups: [""]
+          resources: ["pods", "configmaps", "secrets"]
+          verbs: ["get", "list", "watch"]
+
+    # -- Prometheus metrics configuration
+    # @section -- Workers
+    metrics:
+      # -- Enable metrics endpoint
+      # @section -- Workers
+      enabled: true
+      # -- Metrics port
+      # @section -- Workers
+      port: 8080
+      # -- Metrics endpoint path
+      # @section -- Workers
+      path: "/metrics"
+      # -- ServiceMonitor configuration for Prometheus Operator
+      # @section -- Workers
+      serviceMonitor:
+        # -- Create ServiceMonitor for Prometheus
+        # @section -- Workers
+        enabled: true
+        # -- Scrape interval
+        # @section -- Workers
+        interval: 30s
+        # -- Additional labels for ServiceMonitor
+        # @section -- Workers
+        labels: {}
+        # -- Additional annotations for ServiceMonitor
+        # @section -- Workers
+        annotations: {}
+
+    # -- Additional volumes to mount
+    # @section -- Workers
+    extraVolumes: []
+    # - name: temp-storage
+    #   emptyDir:
+    #     sizeLimit: "1Gi"
+    # - name: config-volume
+    #   configMap:
+    #     name: "{{ include \"helper.fullname\" . }}-worker-config"
+    # - name: secret-volume
+    #   secret:
+    #     secretName: "{{ include \"helper.fullname\" . }}-worker-secret"
+
+    # -- Additional secrets to create
+    # @section -- Workers
+    extraSecret: []
+    # - name: worker-credentials
+    #   data:
+    #     api-key: "base64-encoded-key"
+    #     license: "base64-encoded-license"
+
+    # -- Additional ConfigMaps to create
+    # @section -- Workers
+    extraConfigMap: []
+    # - name: worker-config
+    #   data:
+    #     config.yaml: |
+    #       worker:
+    #         type: "generic"
+    #         timeout: 3600
+
+  # -- Example job worker with event-driven scaling
+  # @section -- Workers
+  - # -- Worker name
+    # @section -- Workers
+    name: job-worker
+    # -- Worker type
+    # @section -- Workers
+    type: job
+    # -- Enable this worker
+    # @section -- Workers
+    enabled: false
+
+    # -- Job-specific configuration
+    # @section -- Workers
+    jobSpec:
+      # -- Container image configuration
+      # @section -- Workers
+      image:
+        repository: "your-registry/job-worker"
+        tag: "latest"
+        pullPolicy: IfNotPresent
+
+      # -- Job execution parameters
+      # @section -- Workers
+      backoffLimit: 3
+      # -- Maximum job duration in seconds
+      # @section -- Workers
+      activeDeadlineSeconds: 3600
+      # -- Time to keep completed jobs (seconds)
+      # @section -- Workers
+      ttlSecondsAfterFinished: 100
+
+      # -- Resource configuration
+      # @section -- Workers
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "1000m"
+          memory: "1Gi"
+
+      # -- Environment variables
+      # @section -- Workers
+      env:
+        - name: RABBITMQ_URL
+          value: "{{ include \"chart.brokerUrl\" . }}"
+        - name: DATABASE_URL
+          value: "{{ include \"chart.databaseUrl\" . }}"
+        - name: INPUT_QUEUE
+          value: "job-tasks"
+        - name: OUTPUT_QUEUE
+          value: "job-responses"
+        - name: WORKER_TYPE
+          value: "job-worker"
+        - name: LOG_LEVEL
+          value: "INFO"
+
+      # -- Environment variables from secrets
+      # @section -- Workers
+      envFromSecret: []
+
+      # -- Environment variables from config maps
+      # @section -- Workers
+      envFromConfigMap: []
+
+      # -- Security context
+      # @section -- Workers
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+    # -- Deployment configuration (not used for jobs)
+    # @section -- Workers
+    deploymentSpec: {}
+
+    # -- KEDA configuration for job scaling
+    # @section -- Workers
+    kedaAutoscaler:
+      enabled: true
+      minReplicaCount: 0
+      maxReplicaCount: 5
+      idleReplicaCount: 0
+      pollingInterval: 15
+      cooldownPeriod: 120
+      scaleTargetKind: "Job"
+      scaleTargetApiVersion: "batch/v1"
+
+      rabbitmq:
+        address: "{{ include \"chart.brokerUrl\" . }}"
+        listName: "job-tasks"
+        listLength: "2"
+        password: ""
+        secretRef: ""
+        secretKey: ""
+
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 60
+          policies:
+          - type: Pods
+            value: 1
+            periodSeconds: 60
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+          - type: Pods
+            value: 2
+            periodSeconds: 30
+
+      fallback:
+        failureThreshold: 2
+        replicas: 1
+
+    # -- RBAC configuration
+    # @section -- Workers
+    role:
+      create: true
+      rules:
+        - apiGroups: ["batch"]
+          resources: ["jobs"]
+          verbs: ["get", "list", "watch", "create", "delete"]
+        - apiGroups: [""]
+          resources: ["pods", "configmaps", "secrets"]
+          verbs: ["get", "list", "watch"]
+
+    # -- Metrics configuration
+    # @section -- Workers
+    metrics:
+      enabled: true
+      port: 8080
+      path: "/metrics"
+      serviceMonitor:
+        enabled: true
+        interval: 30s
+        labels:
+          job-type: "batch-processor"
+        annotations: {}
+
+    # -- Additional volumes
+    # @section -- Workers
+    extraVolumes: []
+
+    # -- Additional secrets
+    # @section -- Workers
+    extraSecret: []
+
+    # -- Additional ConfigMaps
+    # @section -- Workers
+    extraConfigMap: []
+

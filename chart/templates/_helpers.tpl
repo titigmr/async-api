@@ -73,8 +73,33 @@ Define a file checksum to trigger rollout on configmap of secret change
 {{- $path := index . 1 }}
 {{- $resourceType := include (print $.Template.BasePath $path) $ | fromYaml -}}
 {{- if $resourceType -}}
-checksum/{{ $resourceType.kind | lower }}/{{ $resourceType.metadata.name }}: {{ $resourceType.data | toYaml | sha256sum }}
+checksum-{{ $resourceType.kind | lower }}-{{ $resourceType.metadata.name }}: {{ $resourceType.data | toYaml | sha256sum }}
 {{- end -}}
+{{- end -}}
+
+{{/*
+Worker checksum helper - generates checksums for worker ConfigMaps and Secrets
+Parameters:
+- $root: The root context
+- $workerName: The name of the worker
+*/}}
+{{- define "helper.workerChecksum" -}}
+{{- $ := .root }}
+{{- $workerName := .workerName }}
+{{- range $.Values.workers }}
+{{- if eq .name $workerName }}
+{{- if .extraConfigMap }}
+{{- range .extraConfigMap }}
+checksum-configmap-{{ printf "%s-%s" (include "helper.fullname" $) .name }}: {{ .data | toYaml | sha256sum }}
+{{- end }}
+{{- end }}
+{{- if .extraSecret }}
+{{- range .extraSecret }}
+checksum-secret-{{ printf "%s-%s" (include "helper.fullname" $) .name }}: {{ .data | toYaml | sha256sum }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end -}}
 
 

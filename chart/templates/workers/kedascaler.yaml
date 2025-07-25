@@ -1,0 +1,59 @@
+{{ if .Capabilities.APIVersions.Has "keda.sh/v1alpha1" -}}
+{{- range .Values.workers }}
+{{- if and .enabled .kedaAutoscaler.enabled }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ printf "%s-worker-%s-scaledobject" (include "helper.fullname" $) .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
+    worker.name: {{ .name }}
+    async-api.io/resource-type: keda-scaledobject
+spec:
+  scaleTargetRef:
+    name: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+    kind: {{ .kedaAutoscaler.scaleTargetKind | default "Deployment" }}
+    apiVersion: {{ .kedaAutoscaler.scaleTargetApiVersion | default "apps/v1" }}
+  minReplicaCount: {{ .kedaAutoscaler.minReplicaCount }}
+  maxReplicaCount: {{ .kedaAutoscaler.maxReplicaCount }}
+  {{- if .kedaAutoscaler.idleReplicaCount }}
+  idleReplicaCount: {{ .kedaAutoscaler.idleReplicaCount }}
+  {{- end }}
+  {{- if .kedaAutoscaler.pollingInterval }}
+  pollingInterval: {{ .kedaAutoscaler.pollingInterval }}
+  {{- end }}
+  {{- if .kedaAutoscaler.cooldownPeriod }}
+  cooldownPeriod: {{ .kedaAutoscaler.cooldownPeriod }}
+  {{- end }}
+  {{- if .kedaAutoscaler.fallback }}
+  fallback:
+    failureThreshold: {{ .kedaAutoscaler.fallback.failureThreshold }}
+    replicas: {{ .kedaAutoscaler.fallback.replicas }}
+  {{- end }}
+  {{- if .kedaAutoscaler.behavior }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        {{- with .kedaAutoscaler.behavior }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+  {{- end }}
+  triggers:
+    - type: rabbitmq
+      metricType: AverageValue
+      metadata:
+        address: {{ tpl .kedaAutoscaler.rabbitmq.address $ | quote }}
+        listName: {{ .kedaAutoscaler.rabbitmq.listName | quote }}
+        listLength: {{ .kedaAutoscaler.rabbitmq.listLength | quote }}
+        {{- if .kedaAutoscaler.rabbitmq.password }}
+        password: {{ .kedaAutoscaler.rabbitmq.password | quote }}
+        {{- end }}
+      {{- if and .kedaAutoscaler.rabbitmq.secretRef .kedaAutoscaler.rabbitmq.secretKey }}
+      authenticationRef:
+        name: {{ printf "%s-worker-%s-rabbitmq-auth" (include "helper.fullname" $) .name }}
+      {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

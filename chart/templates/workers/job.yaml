@@ -1,0 +1,135 @@
+{{- range .Values.workers }}
+{{- if and .enabled (eq .type "job") }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-worker-%s-%s" (include "helper.fullname" $) .name (randAlphaNum 8 | lower) }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
+    worker.name: {{ .name }}
+    worker.type: {{ .type }}
+    async-api.io/worker-type: {{ .type }}
+spec:
+  {{- with .jobSpec.backoffLimit }}
+  backoffLimit: {{ . }}
+  {{- end }}
+  {{- with .jobSpec.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
+  {{- with .jobSpec.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . }}
+  {{- end }}
+  template:
+    metadata:
+      annotations:
+        {{- include "helper.checksum" (list $ "/api/secret.yaml") | nindent 8 }}
+        {{- include "helper.workerChecksum" (dict "root" $ "workerName" .name) | nindent 8 }}
+      labels:
+        {{- include "helper.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: worker
+        worker.name: {{ .name }}
+        worker.type: {{ .type }}
+        async-api.io/worker-type: {{ .type }}
+    spec:
+      {{- if .role.create }}
+      serviceAccountName: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+      {{- end }}
+      restartPolicy: Never
+      {{- with .jobSpec.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: worker
+        image: "{{ .jobSpec.image.repository }}:{{ .jobSpec.image.tag }}"
+        imagePullPolicy: {{ .jobSpec.image.pullPolicy }}
+        {{- if .jobSpec.env }}
+        env:
+        {{- range .jobSpec.env }}
+        - name: {{ .name }}
+          value: {{ tpl .value $ | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if or .jobSpec.envFromSecret .jobSpec.envFromConfigMap }}
+        envFrom:
+        {{- range .jobSpec.envFromSecret }}
+        - secretRef:
+            name: {{ .secretRef.name }}
+            {{- if .secretRef.optional }}
+            optional: {{ .secretRef.optional }}
+            {{- end }}
+        {{- end }}
+        {{- range .jobSpec.envFromConfigMap }}
+        - configMapRef:
+            name: {{ .configMapRef.name }}
+            {{- if .configMapRef.optional }}
+            optional: {{ .configMapRef.optional }}
+            {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if .metrics.enabled }}
+        ports:
+        - name: metrics
+          containerPort: {{ .metrics.port }}
+          protocol: TCP
+        {{- end }}
+        {{- with .jobSpec.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if .extraVolumes }}
+        volumeMounts:
+        {{- range .extraVolumes }}
+        - name: {{ .name }}
+          mountPath: {{ .mountPath | default (printf "/mnt/%s" .name) }}
+          {{- if .subPath }}
+          subPath: {{ .subPath }}
+          {{- end }}
+          {{- if .readOnly }}
+          readOnly: {{ .readOnly }}
+          {{- end }}
+        {{- end }}
+        {{- end }}
+      {{- if .extraVolumes }}
+      volumes:
+      {{- range .extraVolumes }}
+      - name: {{ .name }}
+        {{- if .emptyDir }}
+        emptyDir:
+          {{- toYaml .emptyDir | nindent 10 }}
+        {{- else if .configMap }}
+        configMap:
+          name: {{ tpl .configMap.name $ }}
+          {{- if .configMap.items }}
+          items:
+            {{- toYaml .configMap.items | nindent 12 }}
+          {{- end }}
+          {{- if .configMap.defaultMode }}
+          defaultMode: {{ .configMap.defaultMode }}
+          {{- end }}
+        {{- else if .secret }}
+        secret:
+          secretName: {{ tpl .secret.secretName $ }}
+          {{- if .secret.items }}
+          items:
+            {{- toYaml .secret.items | nindent 12 }}
+          {{- end }}
+          {{- if .secret.defaultMode }}
+          defaultMode: {{ .secret.defaultMode }}
+          {{- end }}
+        {{- else if .persistentVolumeClaim }}
+        persistentVolumeClaim:
+          claimName: {{ .persistentVolumeClaim.claimName }}
+        {{- else if .hostPath }}
+        hostPath:
+          path: {{ .hostPath.path }}
+          {{- if .hostPath.type }}
+          type: {{ .hostPath.type }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+{{- end }}
+{{- end }}

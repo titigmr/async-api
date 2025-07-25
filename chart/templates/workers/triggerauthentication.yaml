@@ -1,0 +1,21 @@
+{{ if .Capabilities.APIVersions.Has "keda.sh/v1alpha1" -}}
+{{- range .Values.workers }}
+{{- if and .enabled .kedaAutoscaler.enabled .kedaAutoscaler.rabbitmq.secretRef .kedaAutoscaler.rabbitmq.secretKey }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: {{ printf "%s-worker-%s-rabbitmq-auth" (include "helper.fullname" $) .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
+    worker.name: {{ .name }}
+    async-api.io/resource-type: trigger-authentication
+spec:
+  secretTargetRef:
+  - parameter: password
+    name: {{ .kedaAutoscaler.rabbitmq.secretRef }}
+    key: {{ .kedaAutoscaler.rabbitmq.secretKey }}
+{{- end }}
+{{- end }}
+{{- end }}
