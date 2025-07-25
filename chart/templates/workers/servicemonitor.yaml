@@ -1,0 +1,33 @@
+{{ if .Capabilities.APIVersions.Has "monitoring.coreos.com/v1" -}}
+{{- range .Values.workers }}
+{{- if and .enabled .metrics.enabled .metrics.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
+    worker.name: {{ .name }}
+    async-api.io/resource-type: servicemonitor
+    {{- with .metrics.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "helper.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: worker
+      worker.name: {{ .name }}
+      service.type: metrics
+  endpoints:
+  - port: metrics
+    interval: {{ .metrics.serviceMonitor.interval }}
+    path: {{ .metrics.path }}
+    {{- if .metrics.serviceMonitor.honorLabels }}
+    honorLabels: true
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
