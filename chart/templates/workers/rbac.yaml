@@ -1,0 +1,49 @@
+{{- range .Values.workers }}
+{{- if and .enabled .role.create }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
+    worker.name: {{ .name }}
+    async-api.io/resource-type: service-account
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
+    worker.name: {{ .name }}
+    async-api.io/resource-type: role
+rules:
+{{- range .role.rules }}
+- apiGroups: {{ .apiGroups | toJson }}
+  resources: {{ .resources | toJson }}
+  verbs: {{ .verbs | toJson }}
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
+    worker.name: {{ .name }}
+    async-api.io/resource-type: role-binding
+subjects:
+- kind: ServiceAccount
+  name: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+  namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
+{{- end }}

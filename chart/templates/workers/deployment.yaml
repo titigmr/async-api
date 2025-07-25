@@ -1,0 +1,165 @@
+{{- range .Values.workers }}
+{{- if and .enabled (eq .type "deployment") }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
+    worker.name: {{ .name }}
+    worker.type: {{ .type }}
+    async-api.io/worker-type: {{ .type }}
+spec:
+  {{- if not .kedaAutoscaler.enabled }}
+  replicas: {{ .deploymentSpec.replicas | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "helper.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: worker
+      worker.name: {{ .name }}
+  template:
+    metadata:
+      annotations:
+        {{- include "helper.checksum" (list $ "/api/secret.yaml") | nindent 8 }}
+        {{- include "helper.workerChecksum" (dict "root" $ "workerName" .name) | nindent 8 }}
+        {{- with .deploymentSpec.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "helper.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: worker
+        worker.name: {{ .name }}
+        worker.type: {{ .type }}
+        async-api.io/worker-type: {{ .type }}
+        {{- with .deploymentSpec.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .role.create }}
+      serviceAccountName: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+      {{- end }}
+      {{- with .deploymentSpec.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .deploymentSpec.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .deploymentSpec.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .deploymentSpec.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: worker
+        image: "{{ .deploymentSpec.image.repository }}:{{ .deploymentSpec.image.tag }}"
+        imagePullPolicy: {{ .deploymentSpec.image.pullPolicy }}
+        {{- if .deploymentSpec.env }}
+        env:
+        {{- range .deploymentSpec.env }}
+        - name: {{ .name }}
+          value: {{ tpl .value $ | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if or .deploymentSpec.envFromSecret .deploymentSpec.envFromConfigMap }}
+        envFrom:
+        {{- range .deploymentSpec.envFromSecret }}
+        - secretRef:
+            name: {{ .secretRef.name }}
+            {{- if .secretRef.optional }}
+            optional: {{ .secretRef.optional }}
+            {{- end }}
+        {{- end }}
+        {{- range .deploymentSpec.envFromConfigMap }}
+        - configMapRef:
+            name: {{ .configMapRef.name }}
+            {{- if .configMapRef.optional }}
+            optional: {{ .configMapRef.optional }}
+            {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if .metrics.enabled }}
+        ports:
+        - name: metrics
+          containerPort: {{ .metrics.port }}
+          protocol: TCP
+        {{- end }}
+        {{- with .deploymentSpec.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if .extraVolumes }}
+        volumeMounts:
+        {{- range .extraVolumes }}
+        - name: {{ .name }}
+          mountPath: {{ .mountPath | default (printf "/mnt/%s" .name) }}
+          {{- if .subPath }}
+          subPath: {{ .subPath }}
+          {{- end }}
+          {{- if .readOnly }}
+          readOnly: {{ .readOnly }}
+          {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if .metrics.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .metrics.path }}
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: {{ .metrics.path }}
+            port: metrics
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        {{- end }}
+      {{- if .extraVolumes }}
+      volumes:
+      {{- range .extraVolumes }}
+      - name: {{ .name }}
+        {{- if .emptyDir }}
+        emptyDir:
+          {{- toYaml .emptyDir | nindent 10 }}
+        {{- else if .configMap }}
+        configMap:
+          name: {{ tpl .configMap.name $ }}
+          {{- if .configMap.items }}
+          items:
+            {{- toYaml .configMap.items | nindent 12 }}
+          {{- end }}
+          {{- if .configMap.defaultMode }}
+          defaultMode: {{ .configMap.defaultMode }}
+          {{- end }}
+        {{- else if .secret }}
+        secret:
+          secretName: {{ tpl .secret.secretName $ }}
+          {{- if .secret.items }}
+          items:
+            {{- toYaml .secret.items | nindent 12 }}
+          {{- end }}
+          {{- if .secret.defaultMode }}
+          defaultMode: {{ .secret.defaultMode }}
+          {{- end }}
+        {{- else if .persistentVolumeClaim }}
+        persistentVolumeClaim:
+          claimName: {{ .persistentVolumeClaim.claimName }}
+        {{- else if .hostPath }}
+        hostPath:
+          path: {{ .hostPath.path }}
+          {{- if .hostPath.type }}
+          type: {{ .hostPath.type }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- end }}
+{{- end }}
+{{- end }}

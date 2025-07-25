@@ -3,10 +3,10 @@ import logging
 import sys
 from time import sleep
 from typing import Any
-from worker import AsyncTaskInterface, AsyncWorkerRunner, HealthCheckConfig, Infinite, OnShot, SyncTaskInterface
+
 from loguru import logger
 
-from worker import AsyncWorkerRunner, Infinite, TaskInterface
+from worker import AsyncTaskInterface, AsyncWorkerRunner, HealthCheckConfig, Infinite, SyncTaskInterface
 
 
 # --------------------------------
@@ -40,7 +40,7 @@ logger.add(sys.stdout, level="INFO")
 # -------------------------
 # Implémentation de la task
 # "utilisateur" (Sync)
-#-------------------------
+# -------------------------
 class MySyncTask(SyncTaskInterface):
     def execute(self, incoming_message, progress) -> Any:
         task_id = incoming_message.task_id
@@ -49,9 +49,9 @@ class MySyncTask(SyncTaskInterface):
         if body["must_succeed"]:
             time = body["sleep"]
             logger.info(f"Traitement en cours... ({time}s)")
-            sleep(time/2)
+            sleep(time / 2)
             progress(30.0)
-            sleep(time/2)
+            sleep(time / 2)
             progress(30.0)
         else:
             # Exception "fonctionnelle", le message ne sera pas retraité, la tâche aura le status failure
@@ -59,26 +59,26 @@ class MySyncTask(SyncTaskInterface):
         return {"hello": "world"}  # Réponse
 
 
-#-------------------------
+# -------------------------
 # Implémentation de la task
 # "utilisateur" (Async)
-#-------------------------
+# -------------------------
 class MyAsyncTask(AsyncTaskInterface):
     async def execute(self, incoming_message, progress) -> Any:
         task_id = incoming_message.task_id
-        body: dict[Any,Any] = incoming_message.body
+        body: dict[Any, Any] = incoming_message.body
 
         if body["must_succeed"] == True:
             time = body["sleep"]
             logger.info(f"Traitement en cours... ({time}s)")
-            await asyncio.sleep(time/2)
+            await asyncio.sleep(time / 2)
             await progress(30.0)
-            await asyncio.sleep(time/2)
+            await asyncio.sleep(time / 2)
             await progress(30.0)
         else:
             # Exception "fonctionnelle", le message ne sera pas retraité, la tâche aura le status failure
-            raise Exception("Argh") 
-        return { "hello": "world" } # Réponse
+            raise Exception("Argh")
+        return {"hello": "world"}  # Réponse
 
 
 async def main() -> None:
@@ -89,13 +89,14 @@ async def main() -> None:
         # In out queues
         amqp_in_queue="in_queue_python",
         amqp_out_queue="out_queue_python",
-        task_provider=lambda:  MyAsyncTask(), # or  lambda:  MySyncTask()
-        worker_mode=Infinite(5), # or OnShot(), 
+        task_provider=lambda: MyAsyncTask(),  # or  lambda:  MySyncTask()
+        worker_mode=Infinite(5),  # or OnShot(),
         # Optional : HealthCheck
-        health_check_config=HealthCheckConfig("0.0.0.0",8000) # or None
+        health_check_config=HealthCheckConfig("0.0.0.0", 8000),  # or None
     )
     await runner.start()
     logger.info("Stopped.")
+
 
 # Main
 if __name__ == "__main__":

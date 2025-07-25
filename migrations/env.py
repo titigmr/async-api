@@ -6,8 +6,10 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from api.core.database import Base
+from api.core.logger import logger
 
 # Import all models to ensure they are registered with Base
 from api.models import *  # noqa: F403
@@ -68,22 +70,35 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 
+@retry(
+    stop=stop_after_attempt(max_attempt_number=30),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type(exception_types=(Exception,)),
+    reraise=True,
+)
 async def run_async_migrations() -> None:
     """In this scenario we need to create an Engine
     and associate a connection with the context.
+    Includes automatic retry logic for database connectivity.
 
     """
+    logger.info("Connecting to database for migrations...")
 
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration=config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
+    try:
+        async with connectable.connect() as connection:
+            logger.info("✅ Database connection successful, running migrations...")
+            await connection.run_sync(do_run_migrations)
+    except Exception as e:
+        logger.warning(f"⏳ Database connection failed during migrations: {e}")
+        raise
+    finally:
+        await connectable.dispose()
 
 
 def run_migrations_online() -> None:
