@@ -14,9 +14,6 @@ if TYPE_CHECKING:
     from api.models.task import Task
 
 
-# ---------------------------------
-# RabbitMQ Messages
-# ---------------------------------
 class StartMessage(BaseModel):
     message_type: Literal["started"]
     hostname: str = Field(default=..., description="Hote exécutant la tâche.")
@@ -48,16 +45,10 @@ class MessageFromWorker(BaseModel):
     data: InnerMessage
 
 
-# ---------------------------------
-# Service Exceptions
-# ---------------------------------
 class MessageServiceError(Exception):
     pass
 
 
-# ---------------------------------
-# Service
-# ---------------------------------
 class MessageService:
     def __init__(
         self,
@@ -65,9 +56,9 @@ class MessageService:
         notification_service: NotificationService,
         session: AsyncSession,
     ) -> None:
-        self.task_repository = task_repository
-        self.notification_service = notification_service
-        self.session = session
+        self.task_repository: TaskRepository = task_repository
+        self.notification_service: NotificationService = notification_service
+        self.session: AsyncSession = session
 
     @staticmethod
     def to_onliner_message(message: str) -> str:

@@ -5,51 +5,152 @@ nameOverride: ""
 # @section -- General
 fullnameOverride: ""
 
-# Database connection configuration
+# Database connection configuration with intelligent fallback strategy
 # @section -- Database
 database:
-  # -- Database connection configuration
-  # If host is empty, uses internal PostgreSQL service when postgresql.enabled=true
-  host: ""  # Leave empty to use internal PostgreSQL
-  # host: "external-postgres.company.com"  # For external database
-  port: 5432
-  database: ""  # Defaults to postgresql.auth.database
-  username: ""  # Defaults to postgresql.auth.username
-  password: ""  # Defaults to postgresql.auth.password
-  scheme: "postgresql+asyncpg"
-  # -- Complete database URL (overrides individual components above)
+  # -- Database connection URL (creates secret with DATABASE_URL)
+  # Example: "postgresql+asyncpg://user:pass@host:5432/dbname"
   url: ""
-  # -- Load from existing secret
-  fromSecret: {}
-  #  name: "database-secret"
-  #  key: "DATABASE_URL"
 
-# Message broker connection configuration
+  # -- Use existing secret for database url (highest priority - no secret creation)
+  urlFromSecret: {}
+    # -- Name of existing secret containing database url
+    # name: "my-database-secret"
+    # -- Key in the secret containing the database url
+    # key: "DATABASE_URL"
+
+  # -- Database components (creates secret with DB_HOST, DB_PORT, etc.)
+  # @section -- Database
+  components:
+    # -- Database host
+    host: ""
+    # -- Database port
+    port: 5432
+    # -- Database name
+    name: ""
+    # -- Database username
+    username: ""
+    # -- Database password
+    password: ""
+    # -- Database scheme for URL construction
+    scheme: "postgresql+asyncpg"
+
+# Message broker connection configuration with intelligent fallback strategy
 # @section -- Broker
 broker:
-  # -- Message broker connection configuration
-  # If host is empty, uses internal RabbitMQ service when rabbitmq.enabled=true
-  host: ""  # Leave empty to use internal RabbitMQ
-  # host: "external-rabbitmq.company.com"  # For external broker
-  port: 5672
-  username: ""  # Defaults to rabbitmq.auth.username
-  password: ""  # Defaults to rabbitmq.auth.password
-  scheme: "amqp"
-  vhost: "/"
-  # -- Complete broker URL (overrides individual components above)
+  # -- Broker connection URL (creates secret with BROKER_URL)
+  # Example: "amqp://user:pass@host:5672/vhost"
   url: ""
-  # -- Load from existing secret
-  fromSecret: {}
-  #  name: "broker-secret"
-  #  key: "BROKER_URL"
 
-global:
-  # -- Map of environment variables to inject into all containers.
-  # @section -- Global
-  env: {}
-  # -- Map of environment variables to inject into all containers.
-  # @section -- Global
-  secrets: {}
+  # -- Use existing secret for broker url (highest priority - no secret creation)
+  urlFromSecret: {}
+    # -- Name of existing secret containing broker url
+    # name: "my-broker-secret"
+    # -- Key in the secret containing the broker url
+    # key: "BROKER_URL"
+
+  # -- Broker components (creates secret with BROKER_HOST, BROKER_PORT, etc.)
+  # @section -- Broker
+  components:
+    # -- Broker host
+    host: ""
+    # -- Broker port
+    port: 5672
+    # -- Broker username
+    username: ""
+    # -- Broker password
+    password: ""
+    # -- Virtual host for broker URL construction
+    vhost: "/"
+    # -- Broker scheme for URL construction
+    scheme: "amqp"
+
+# Configuration files management
+# @section -- Config
+config:
+  # -- Services configuration file content or existing secret reference
+  # @section -- Config
+  services:
+    # -- Services configuration content (YAML format)
+    # -- If provided, will create a ConfigMap with this content
+    content:
+      - name: example
+        quotas: 1000
+        json_schema: ./config/schemas/example.json
+        in_queue: example_queue_in
+        out_queue: example_queue_out
+      - name: example2
+        # json_schema: ./schemas/example.json # Default: No schema
+        # quotas: 1000                        # Default: No quotas
+        # in_queue: example_queue_in          # Default: <svc>_queue_in
+        # out_queue: example_queue_out        # Default: <svc>_queue_out
+
+    # -- Use existing secret for services configuration (optional)
+    fromSecret: {}
+      # -- Name of existing secret containing services.yaml
+      # name: ""
+      # -- Key in the secret containing the services configuration
+      # key: "services.yaml"
+
+  # -- Clients configuration file content or existing secret reference
+  # @section -- Config
+  clients:
+    # -- Clients configuration content (YAML format)
+    # -- If provided, will create a ConfigMap with this content
+    content:
+      - client_id: client1
+        #client_secret: $CLIENT_SECRET_1
+        authorizations:
+          # - service: all # all access
+          #   quotas: 100  # Quotas for each services
+          - service: example
+            quotas: 100
+          - service: example2
+            # quotas: 100 # Default: No quotas
+
+    # -- Use existing secret for clients configuration (optional)
+    fromSecret: {}
+      # -- Name of existing secret containing clients.yaml
+      # name: ""
+      # -- Key in the secret containing the clients configuration
+      # key: "clients.yaml"
+
+  # -- JSON Schema files configuration
+  # @section -- Config
+  schemas:
+    # -- List of JSON schema files to mount
+    # -- Each entry will create a file in /app/config/schemas/
+    files:
+      - name: "example.json"
+        content: |
+          {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "properties": {
+              "sleep": {
+                "type": "integer",
+                "description": "Durée d'attente en secondes"
+              },
+              "mustSucceed": {
+                "type": "boolean",
+                "description": "Indique si la tâche doit réussir"
+              }
+            },
+            "required": ["sleep"],
+            "additionalProperties": false
+          }
+
+    # -- Alternative: Use existing secret for schemas
+    fromSecret: {}
+      # -- Name of existing secret containing schema files
+      # name: ""
+      # -- List of keys in the secret (each key will be mounted as a file)
+      # keys: []
+
+  # -- Mount path for configuration files in containers
+  # @section -- Config
+  mountPath: "/app/config"
+
 api:
   # -- The number of application controller pods to run.
   # @section -- Api
@@ -64,7 +165,7 @@ api:
     # -- Tag to use for the app.
     # @section -- Api
     # Overrides the image tag whose default is the chart appVersion.
-    tag: "v0.1.0"
+    tag: ~
 
   listener:
     # @section -- Api.listener
@@ -75,31 +176,60 @@ api:
     args: []
     # @ Section -- Api.listener
     # Configure probe settings for the listener container.
-    probes: {}
-    # @ Section -- Api.listener
-    # Configure probes for the listener container (liveness, readiness, startup).
-    #  livenessProbe:
-    #    exec:
-    #      command:
-    #      - cat
-    #      - /tmp/healthy
-    #    initialDelaySeconds: 5
-    #    periodSeconds: 5
-    #  readinessProbe:
-    #    exec:
-    #      command:
-    #      - cat
-    #      - /tmp/healthy
-    #    initialDelaySeconds: 5
-    #    periodSeconds: 5
+    probes:
+      # @ Section -- Api.listener
+      # Configure probes for the listener container (liveness, readiness, startup).
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8081
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8081
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        timeoutSeconds: 5
+        failureThreshold: 3
     env: {}
     # @ section -- Api.listener
     # -- listener container env secrets, it will be injected into a secret and loaded into the container.
 
+    # -- Service configuration for listener health check endpoints
+    # @section -- Api.listener
+    service:
+      # -- Service type for listener health check
+      # @section -- Api.listener
+      type: "ClusterIP"
+      # -- Service port for listener health check
+      # @section -- Api.listener
+      port: 8081
+      # -- Service target port for listener health check
+      # @section -- Api.listener
+      targetPort: 8081
+      # -- Service port name for listener health check
+      # @section -- Api.listener
+      portName: "health"
+      # -- Service protocol for listener health check
+      # @section -- Api.listener
+      protocol: "TCP"
+      # -- Service node port (when type is NodePort)
+      # @section -- Api.listener
+      nodePort: 31081
+      # -- Service annotations for listener health check
+      # @section -- Api.listener
+      annotations: {}
+      # -- Service extra ports for listener health check
+      # @section -- Api.listener
+      extraPorts: []
+
   config:
     # @ section -- Api.config
     # Configuration for the api.
-    env: {}
 
   ingress:
     # -- Whether or not ingress should be enabled.
@@ -170,7 +300,7 @@ api:
   #       name: config
   # -- Api container port.
   # @section -- Api
-  containerPort: 8080
+  containerPort: 8000
   # -- Api extra container ports.
   # @section -- Api
   extraPorts: []
@@ -205,69 +335,38 @@ api:
   # @section -- Api
   secrets: {}
   probes:
-    healthcheck:
-      # -- Api container healthcheck endpoint.
-      # @section -- Api
-      path: "/"
-      # -- Port to use for healthcheck (defaults to container port if not set)
-      # @section -- Api
-      port: 8080
-    startupProbe:
-      # -- Whether or not enable the probe.
-      # @section -- Api
-      enabled: true
-      # -- Number of seconds after the container has started before probe is initiated.
-      # @section -- Api
-      initialDelaySeconds: 0
-      # -- Minimum consecutive successes for the probe to be considered successful after having failed.
-      # @section -- Api
-      successThreshold: 1
-      # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
-      # @section -- Api
-      failureThreshold: 10
-      # -- How often (in seconds) to perform the probe.
-      # @section -- Api
-      periodSeconds: 10
-      # -- Number of seconds after which the probe times out.
-      # @section -- Api
-      timeoutSeconds: 5
+    # -- Startup probe configuration for the API container
+    # @section -- Api
+    # startupProbe:
+    #   httpGet:
+    #     path: "/internal/ready"
+    #     port: 8000
+    #   initialDelaySeconds: 0
+    #   successThreshold: 1
+    #   failureThreshold: 30
+    #   periodSeconds: 10
+    #   timeoutSeconds: 5
+    # -- Readiness probe configuration for the API container
+    # @section -- Api
     readinessProbe:
-      # -- Whether or not enable the probe.
-      # @section -- Api
-      enabled: true
-      # -- Number of seconds after the container has started before probe is initiated.
-      # @section -- Api
-      initialDelaySeconds: 10
-      # -- Minimum consecutive successes for the probe to be considered successful after having failed.
-      # @section -- Api
-      successThreshold: 2
-      # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
-      # @section -- Api
-      failureThreshold: 2
-      # -- How often (in seconds) to perform the probe.
-      # @section -- Api
-      periodSeconds: 10
-      # -- Number of seconds after which the probe times out.
-      # @section -- Api
-      timeoutSeconds: 5
-    livenessProbe:
-      # -- Whether or not enable the probe.
-      # @section -- Api
-      enabled: true
-      # -- Number of seconds after the container has started before probe is initiated.
-      # @section -- Api
-      initialDelaySeconds: 30
-      # -- Minimum consecutive successes for the probe to be considered successful after having failed.
-      # @section -- Api
+      httpGet:
+        path: "/internal/ready"
+        port: 8000
+      initialDelaySeconds: 5
       successThreshold: 1
-      # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
-      # @section -- Api
       failureThreshold: 3
-      # -- How often (in seconds) to perform the probe.
-      # @section -- Api
+      periodSeconds: 10
+      timeoutSeconds: 5
+    # -- Liveness probe configuration for the API container
+    # @section -- Api
+    livenessProbe:
+      httpGet:
+        path: "/internal/health"
+        port: 8000
+      initialDelaySeconds: 30
+      successThreshold: 1
+      failureThreshold: 3
       periodSeconds: 30
-      # -- Number of seconds after which the probe times out.
-      # @section -- Api
       timeoutSeconds: 5
   strategy:
     # -- Strategy type used to replace old Pods by new ones, can be `Recreate` or `RollingUpdate`.
@@ -350,7 +449,7 @@ api:
     type: "ClusterIP"
     # -- Port used by the service.
     # @section -- Api
-    port: 80
+    port: 8080
     # -- Port used when type is `NodePort` to expose the service on the given node port.
     # @section -- Api
     nodePort: 31000
@@ -696,547 +795,6 @@ extraObjects: []
 #       database: "keycloak"
 #       architecture: "standalone"
 
-
-
-worker:
-  # -- Should the app run as a Job instead of a Deployment.
-  # @section -- Worker
-  statefulset: false
-  # -- The number of application controller pods to run.
-  # @section -- Worker
-  replicaCount: 1
-  image:
-    # -- Repository to use for the app.
-    # @section -- Worker
-    repository: "github.com/titigmr/worker"
-    # -- Image pull policy for the app.
-    # @section -- Worker
-    pullPolicy: "IfNotPresent"
-    # -- Tag to use for the app.
-    # @section -- Worker
-    # Overrides the image tag whose default is the chart appVersion.
-    tag: ""
-  ingress:
-    # -- Whether or not ingress should be enabled.
-    # @section -- Worker
-    enabled: true
-    # -- Defines which ingress controller will implement the resource.
-    # @section -- Worker
-    className: ""
-    # -- Additional ingress annotations.
-    # @section -- Worker
-    annotations: {}
-    # -- Additional ingress labels.
-    # @section -- Worker
-    labels: {}
-    hosts:
-      - backend:
-          # -- Name of the backend service linked to the host record (leave empty to use the app service).
-          # @section -- Worker
-          serviceName: ""
-          # -- Port used by the backend service linked to the host record (leave null to use the app service port).
-          # @section -- Worker
-          portNumber: null
-        # -- Name of the host record.
-        # @section -- Worker
-        name: "domain.local"
-        # -- Path type of the host record.
-        # @section -- Worker
-        pathType: "Prefix"
-        # -- Path of the host record to manage routing.
-        # @section -- Worker
-        path: "/"
-    # -- Enable TLS configuration.
-    # @section -- Worker
-    tls: []
-    # - secretName: domain.local-tls
-    #   hosts:
-    #   - domain.local
-  # -- Annotations for the app deployed pods.
-  # @section -- Worker
-  podAnnotations: {}
-  # -- Labels for the app deployed pods.
-  # @section -- Worker
-  podLabels: {}
-  # -- Toggle and define pod-level security context.
-  # @section -- Worker
-  podSecurityContext: {}
-  # fsGroup: 2000
-  # -- Init containers to add to the app pod.
-  # @section -- Worker
-  initContainers: []
-  # - name: wait-for-keycloak
-  #   image: docker.io/curlimages/curl:latest
-  #   command:
-  #   - "/bin/sh"
-  #   - "-c"
-  #   args:
-  #   - "while [ $(curl -sw '%{http_code}' http://webapp.svc.cluster.local -o /dev/null) -ne 200 ]; do sleep 5; echo 'Waiting for the webapp...'; done"
-  #   volumeMounts:
-  #   - mountPath: /custom-volume
-  #     name: custom-volume
-  # -- Extra containers to add to the app pod as sidecars.
-  # @section -- Worker
-  extraContainers: []
-  # - name: fluentd
-  #   image: "fluentd"
-  #   volumeMounts:
-  #     - mountPath: /my-volume/config
-  #       name: config
-  # -- Worker container port.
-  # @section -- Worker
-  containerPort: 8080
-  # -- Worker extra container ports.
-  # @section -- Worker
-  extraPorts: []
-  # - containerPort: 9090
-  #   protocol: "TCP"
-  # -- Worker container command.
-  # @section -- Worker
-  command: []
-  # -- Worker container command args.
-  # @section -- Worker
-  args: []
-  # -- Toggle and define container-level security context.
-  # @section -- Worker
-  securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
-  # -- Worker container env variables loaded from configmap or secret reference.
-  # @section -- Worker
-  envFrom: []
-  # - configMapRef:
-  #     name: my-config
-  # - secretRef:
-  #     name: my-secret
-  # -- Worker container env variables, it will be injected into a configmap and loaded into the container.
-  # @section -- Worker
-  env: {}
-  # -- Worker container env secrets, it will be injected into a secret and loaded into the container.
-  # @section -- Worker
-  secrets: {}
-  probes:
-    healthcheck:
-      # -- Worker container healthcheck endpoint.
-      # @section -- Worker
-      path: "/"
-      # -- Port to use for healthcheck (defaults to container port if not set)
-      # @section -- Worker
-      port: 8080
-    startupProbe:
-      # -- Whether or not enable the probe.
-      # @section -- Worker
-      enabled: true
-      # -- Number of seconds after the container has started before probe is initiated.
-      # @section -- Worker
-      initialDelaySeconds: 0
-      # -- Minimum consecutive successes for the probe to be considered successful after having failed.
-      # @section -- Worker
-      successThreshold: 1
-      # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
-      # @section -- Worker
-      failureThreshold: 10
-      # -- How often (in seconds) to perform the probe.
-      # @section -- Worker
-      periodSeconds: 10
-      # -- Number of seconds after which the probe times out.
-      # @section -- Worker
-      timeoutSeconds: 5
-    readinessProbe:
-      # -- Whether or not enable the probe.
-      # @section -- Worker
-      enabled: true
-      # -- Number of seconds after the container has started before probe is initiated.
-      # @section -- Worker
-      initialDelaySeconds: 10
-      # -- Minimum consecutive successes for the probe to be considered successful after having failed.
-      # @section -- Worker
-      successThreshold: 2
-      # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
-      # @section -- Worker
-      failureThreshold: 2
-      # -- How often (in seconds) to perform the probe.
-      # @section -- Worker
-      periodSeconds: 10
-      # -- Number of seconds after which the probe times out.
-      # @section -- Worker
-      timeoutSeconds: 5
-    livenessProbe:
-      # -- Whether or not enable the probe.
-      # @section -- Worker
-      enabled: true
-      # -- Number of seconds after the container has started before probe is initiated.
-      # @section -- Worker
-      initialDelaySeconds: 30
-      # -- Minimum consecutive successes for the probe to be considered successful after having failed.
-      # @section -- Worker
-      successThreshold: 1
-      # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
-      # @section -- Worker
-      failureThreshold: 3
-      # -- How often (in seconds) to perform the probe.
-      # @section -- Worker
-      periodSeconds: 30
-      # -- Number of seconds after which the probe times out.
-      # @section -- Worker
-      timeoutSeconds: 5
-  strategy:
-    # -- Strategy type used to replace old Pods by new ones, can be `Recreate` or `RollingUpdate`.
-    # @section -- Worker
-    type: "RollingUpdate"
-    rollingUpdate:
-      # -- The maximum number of pods that can be unavailable during the update process.
-      # @section -- Worker
-      maxUnavailable: 1
-      # -- The maximum number of pods that can be scheduled above the desired number of pods.
-      # @section -- Worker
-      maxSurge: 1
-  # -- Image credentials configuration.
-  # @section -- Worker
-  imagePullSecrets: []
-  # - name: "pullsecret-name-1"
-  #   create: false
-  # - name: "pullsecret-name-2"
-  #   create: true
-  #   registry: ""
-  #   username: ""
-  #   password: ""
-  #   email: ""
-  # -- Host aliases that will be injected at pod-level into /etc/hosts.
-  # @section -- Worker
-  hostAliases: []
-  # - ip: "127.0.0.1"
-  #   hostnames:
-  #   - "foo.local"
-  #   - "bar.local"
-  # - ip: "10.1.2.3"
-  #   hostnames:
-  #   - "foo.remote"
-  #   - "bar.remote"
-  # -- List of volumes to add.
-  # @section -- Worker
-  volumes: []
-  # - name: config-volume
-  #   configMap:
-  #     name: log-config
-  #     items:
-  #       - key: log_level
-  #         path: log_level.conf
-  # - name: cache-volume
-  #   emptyDir:
-  #     sizeLimit: 500Mi
-  # - name: image-volume
-  #   image:
-  #     reference: quay.io/crio/artifact:v2
-  #     pullPolicy: IfNotPresent
-  # -- List of volumeClaims to add.
-  # @section -- Worker
-  volumeClaims: []
-  # - metadata:
-  #     name: app-volume
-  #   spec:
-  #     accessModes: [ "ReadWriteOnce" ]
-  #     storageClassName: "my-storage-class"
-  #     resources:
-  #       requests:
-  #         storage: 1Gi
-  # -- List of mounts to add (normally used with `volumes` or `volumeClaims`).
-  # @section -- Worker
-  volumeMounts: []
-  # - name: config-volume
-  #   mountPath: /app/config
-  #   subPath: config
-  #   readOnly: true
-  #   mountPropagation: None
-  #   recursiveReadOnly: Enabled
-  # - name: cache-volume
-  #   mountPath: /app/cache
-  # - name: image-volume
-  #   mountPath: /app/content
-  # - name: storage-volume
-  #   mountPath: /app/storage
-  service:
-    # -- Type of service to create for the app.
-    # @section -- Worker
-    type: "ClusterIP"
-    # -- Port used by the service.
-    # @section -- Worker
-    port: 80
-    # -- Port used when type is `NodePort` to expose the service on the given node port.
-    # @section -- Worker
-    nodePort: 31000
-    # -- Port name used by the service.
-    # @section -- Worker
-    portName: "http"
-    # -- Protocol used by the service.
-    # @section -- Worker
-    protocol: "TCP"
-    # -- Extra service ports.
-    # @section -- Worker
-    extraPorts: []
-    # - port: 9090
-    #   targetPort: 9090
-    #   protocol: "TCP"
-    #   name: "metrics"
-  resources:
-    requests:
-      # -- Memory request for the app.
-      # @section -- Worker
-      memory: "256Mi"
-      # -- CPU request for the app.
-      # @section -- Worker
-      cpu: "100m"
-      # Other stuff like GPU, etc could be added here.
-      # nvidia.com/gpu: "1"
-    limits:
-      # -- Memory limit for the app.
-      # @section -- Worker
-      memory: "2Gi"
-      # -- CPU limit for the app.
-      # @section -- Worker
-      cpu: "500m"
-      # Other stuff like GPU, etc could be added here.
-      # nvidia.com/gpu: "1"
-  autoscaling:
-    # -- Enable Horizontal Pod Autoscaler for the app.
-    # @section -- Worker
-    enabled: false
-    # -- Minimum number of replicas for the app.
-    # @section -- Worker
-    minReplicas: 1
-    # -- Maximum number of replicas for the app.
-    # @section -- Worker
-    maxReplicas: 3
-    # -- Average CPU utilization percentage for the app.
-    # @section -- Worker
-    targetCPUUtilizationPercentage: 80
-    # -- Average memory utilization percentage for the app.
-    # @section -- Worker
-    targetMemoryUtilizationPercentage: 80
-  # -- Revision history limit for the app.
-  # @section -- Worker
-  revisionHistoryLimit: 10
-  # -- Default node selector for app.
-  # @section -- Worker
-  nodeSelector: {}
-  # kubernetes.io/os: "linux"
-  # kubernetes.io/arch: "amd64"
-  # kubernetes.io/hostname: "node1"
-  # -- Default tolerations for app.
-  # @section -- Worker
-  tolerations: []
-  # - key: "key1"
-  #   operator: "Equal"
-  #   value: "value1"
-  #   effect: "NoSchedule"
-  #   tolerationSeconds: 3600
-  # - key: "key2"
-  #   operator: "Equal"
-  #   value: "value2"
-  #   effect: "NoExecute"
-  #   tolerationSeconds: 3600
-  # - key: "key3"
-  #   operator: "Exists"
-  #   effect: "PreferNoSchedule"
-  #   tolerationSeconds: 3600
-  # -- Affinity used for app pod.
-  # @section -- Worker
-  affinity: {}
-  # podAntiAffinity:
-  #   requiredDuringSchedulingIgnoredDuringExecution:
-  #   - labelSelector:
-  #       matchExpressions:
-  #       - key: "app.kubernetes.io/name"
-  #         operator: "In"
-  #         values:
-  #         - "taskapi-worker"
-  #     topologyKey: "kubernetes.io/hostname"
-  serviceAccount:
-    # -- Enable the service account.
-    # @section -- Worker
-    enabled: false
-    # -- Create a service account.
-    # @section -- Worker
-    create: false
-    # -- Annotations applied to created service account.
-    # @section -- Worker
-    annotations: {}
-    # -- Service account name.
-    # @section -- Worker
-    name: ""
-    # -- Should the service account access token be automount in the pod.
-    # @section -- Worker
-    automountServiceAccountToken: false
-    role:
-      # -- Should the role be created.
-      # @section -- Worker
-      create: false
-      # -- Role rules associated with the service account.
-      # @section -- Worker
-      rules: []
-      # - apiGroups:
-      #   - argoproj.io
-      #   resources:
-      #   - applications
-      #   - applicationsets
-      #   - appprojects
-      #   verbs:
-      #   - create
-      #   - get
-      #   - list
-      #   - watch
-      #   - update
-      #   - delete
-      #   - patch
-    clusterRole:
-      # -- Should the clusterRole be created.
-      # @section -- Worker
-      create: false
-      # -- ClusterRole rules associated with the service account.
-      # @section -- Worker
-      rules: []
-      # - apiGroups:
-      #   - argoproj.io
-      #   resources:
-      #   - applications
-      #   - applicationsets
-      #   - appprojects
-      #   verbs:
-      #   - create
-      #   - get
-      #   - list
-      #   - watch
-      #   - update
-      #   - delete
-      #   - patch
-  ## Ref: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
-  pdb:
-    # -- Deploy a PodDisruptionBudget for the app
-    # @section -- Worker
-    enabled: false
-    # -- Labels to be added to app pdb.
-    # @section -- Worker
-    labels: {}
-    # -- Annotations to be added to app pdb.
-    # @section -- Worker
-    annotations: {}
-    # -- Number of pods that are available after eviction as number or percentage (eg.: 50%).
-    # @section -- Worker
-    # @default -- `""` (defaults to 0 if not specified)
-    minAvailable: ""
-    # -- Number of pods that are unavailable after eviction as number or percentage (eg.: 50%). Has higher precedence over `worker.pdb.minAvailable`.
-    # @section -- Worker
-    maxUnavailable: ""
-  networkPolicy:
-    # -- Create NetworkPolicy object for the app.
-    # @section -- Worker
-    create: false
-    # -- Policy types used in the NetworkPolicy object.
-    # @section -- Worker
-    policyTypes:
-      - Ingress
-    # -- Ingress rules for the NetworkPolicy object.
-    # @section -- Worker
-    ingress: []
-    # - from:
-    #   - ipBlock:
-    #       cidr: 172.17.0.0/16
-    #       except:
-    #       - 172.17.1.0/24
-    #   - namespaceSelector:
-    #       matchLabels:
-    #         project: myproject
-    #   - podSelector:
-    #       matchLabels:
-    #         role: frontend
-    #   ports:
-    #   - protocol: TCP
-    #     port: 6379
-    # -- Egress rules for the NetworkPolicy object.
-    # @section -- Worker
-    egress: []
-    # - to:
-    #   - ipBlock:
-    #       cidr: 10.0.0.0/24
-    #   ports:
-    #   - protocol: TCP
-    #     port: 32000
-    #     endPort: 32768
-  metrics:
-    # -- Deploy metrics service.
-    # @section -- Worker
-    enabled: false
-    service:
-      # -- Metrics service annotations.
-      # @section -- Worker
-      annotations: {}
-      # -- Metrics service labels.
-      # @section -- Worker
-      labels: {}
-      # -- Metrics service port.
-      # @section -- Worker
-      port: 8080
-      # -- Metrics service target port.
-      # @section -- Worker
-      targetPort: 8080
-    serviceMonitor:
-      # -- Enable a prometheus ServiceMonitor.
-      # @section -- Worker
-      enabled: false
-      # -- Prometheus ServiceMonitor labels.
-      # @section -- Worker
-      labels: {}
-      # -- Prometheus ServiceMonitor annotations.
-      # @section -- Worker
-      annotations: {}
-      endpoints:
-        - basicAuth:
-            # -- The secret in the service monitor namespace that contains the username for authentication.
-            # @section -- Worker
-            username: ""
-            # -- The secret in the service monitor namespace that contains the password for authentication.
-            # @section -- Worker
-            password: ""
-          bearerTokenSecret:
-            # -- Secret name to mount to read bearer token for scraping targets. The secret needs to be in the same namespace as the service monitor and accessible by the Prometheus Operator.
-            # @section -- Worker
-            name: ""
-            # -- Secret key to mount to read bearer token for scraping targets. The secret needs to be in the same namespace as the service monitor and accessible by the Prometheus Operator.
-            # @section -- Worker
-            key: ""
-          # -- Prometheus ServiceMonitor interval.
-          # @section -- Worker
-          interval: "30s"
-          # -- Prometheus ServiceMonitor scrapeTimeout. If empty, Prometheus uses the global scrape timeout unless it is less than the target's scrape interval value in which the latter is used.
-          # @section -- Worker
-          scrapeTimeout: "10s"
-          # -- Path used by the Prometheus ServiceMonitor to scrape metrics.
-          # @section -- Worker
-          path: "/metrics"
-          # -- When true, honorLabels preserves the metric’s labels when they collide with the target’s labels.
-          # @section -- Worker
-          honorLabels: false
-          # -- Prometheus RelabelConfigs to apply to samples before scraping.
-          # @section -- Worker
-          relabelings: []
-          # -- Prometheus MetricRelabelConfigs to apply to samples before ingestion.
-          # @section -- Worker
-          metricRelabelings: []
-          # -- Prometheus ServiceMonitor selector.
-          # @section -- Worker
-          selector: {}
-          # prometheus: kube-prometheus
-          # -- Prometheus ServiceMonitor scheme.
-          # @section -- Worker
-          scheme: ""
-          # -- Prometheus ServiceMonitor tlsConfig.
-          # @section -- Worker
-          tlsConfig: {}
-
 # PostgreSQL configuration
 # @section -- PostgreSQL
 postgresql:
@@ -1255,7 +813,7 @@ postgresql:
     # -- PostgreSQL username for application
     username: "asynctask"
     # -- PostgreSQL password for application user
-    password: "asynctask123"
+    password: "changeme123"
     # -- Use existing secret for PostgreSQL passwords
     existingSecret: ""
   # -- PostgreSQL primary configuration
@@ -1305,9 +863,9 @@ rabbitmq:
   # -- RabbitMQ authentication configuration
   auth:
     # -- RabbitMQ root username
-    username: "kalo"
+    username: "asynctask"
     # -- RabbitMQ root password
-    password: "kalo"
+    password: "changeme123"
     # -- RabbitMQ erlang cookie
     erlangCookie: "secretcookie"
     # -- Use existing secret for RabbitMQ passwords
@@ -1383,28 +941,6 @@ workers:
     # -- Job-specific configuration (only used when type=job)
     # @section -- Workers
     jobSpec: {}
-    # image:
-    #   repository: "your-registry/worker"
-    #   tag: "latest"
-    #   pullPolicy: IfNotPresent
-    # backoffLimit: 3
-    # activeDeadlineSeconds: 3600
-    # ttlSecondsAfterFinished: 100
-    # resources:
-    #   requests:
-    #     cpu: "100m"
-    #     memory: "128Mi"
-    #   limits:
-    #     cpu: "500m"
-    #     memory: "512Mi"
-    # env:
-    #   - name: WORKER_TYPE
-    #     value: "job-worker"
-    # envFromSecret: []
-    # envFromConfigMap: []
-    # securityContext:
-    #   runAsNonRoot: true
-    #   runAsUser: 1000
 
     # -- Deployment-specific configuration (only used when type=deployment)
     # @section -- Workers
@@ -1421,6 +957,35 @@ workers:
         # -- Image pull policy
         # @section -- Workers
         pullPolicy: IfNotPresent
+
+      # -- Number of replicas (ignored if KEDA autoscaling is enabled)
+      # @section -- Workers
+      replicas: 1
+
+      # -- Service account name for the worker pods
+      # @section -- Workers
+      serviceAccountName: ""
+
+      # -- Image pull secrets for the worker
+      # @section -- Workers
+      imagePullSecrets: []
+      # - name: "my-registry-secret"
+
+      # -- Extra annotations for worker pods
+      # @section -- Workers
+      extraAnnotations: {}
+
+      # -- Extra labels for worker pods
+      # @section -- Workers
+      extraLabels: {}
+
+      # -- Container ports configuration
+      # @section -- Workers
+      ports:
+        # -- Health check port (used for probes and health service)
+        # @section -- Workers
+        health: 8080
+        metrics: 8080
 
       # -- Resource limits and requests
       # @section -- Workers
@@ -1440,23 +1005,60 @@ workers:
           # @section -- Workers
           memory: "512Mi"
 
+      # -- Health check probes configuration
+      # @section -- Workers
+      probes:
+        # -- Startup probe configuration
+        # @section -- Workers
+        startupProbe:
+          httpGet:
+            path: "/health"
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+        # -- Readiness probe configuration
+        # @section -- Workers
+        readinessProbe:
+          httpGet:
+            path: "/ready"
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        # -- Liveness probe configuration
+        # @section -- Workers
+        livenessProbe:
+          httpGet:
+            path: "/health"
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+
       # -- Environment variables as key-value pairs
       # @section -- Workers
       env:
-        - name: RABBITMQ_URL
-          value: "{{ include \"chart.brokerUrl\" . }}"
-        - name: DATABASE_URL
-          value: "{{ include \"chart.databaseUrl\" . }}"
-        - name: INPUT_QUEUE
-          value: "worker-tasks"
-        - name: OUTPUT_QUEUE
-          value: "worker-responses"
-        - name: WORKER_TYPE
-          value: "generic-worker"
+        - name: IN_QUEUE_NAME
+          value: "example_queue_in"
+        - name: OUT_QUEUE_NAME
+          value: "example_queue_out"
         - name: LOG_LEVEL
           value: "INFO"
+        - name: CONSUMER_ENABLE_HEALTH_CHECK_SERVER
+          value: "true"
+        - name: CONSUMER_HEALTH_CHECK_PORT
+          value: "8080"
+        - name: CONSUMER_HEALTH_CHECK_HOST
+          value: "0.0.0.0"
 
-      # -- Environment variables from secrets
+      # -- Environment variables from secrets (database and broker URLs will be injected automatically)
       # @section -- Workers
       envFromSecret: []
       # - secretRef:
@@ -1474,16 +1076,19 @@ workers:
       #     name: shared-config
       #     optional: true
 
-      # -- Number of replicas (ignored if KEDA autoscaling is enabled)
-      # @section -- Workers
-      replicas: 1
-
-      # -- Pod security context
+      # -- Container security context
       # @section -- Workers
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+
+      # -- Pod security context
+      # @section -- Workers
+      podSecurityContext:
         fsGroup: 1000
+      # fsGroup: 1000
+      # runAsUser: 1000
+      # runAsGroup: 1000
 
       # -- Pod annotations
       # @section -- Workers
@@ -1496,14 +1101,37 @@ workers:
       # -- Node selector
       # @section -- Workers
       nodeSelector: {}
+      # kubernetes.io/os: linux
 
       # -- Tolerations
       # @section -- Workers
       tolerations: []
+      # - key: "key1"
+      #   operator: "Equal"
+      #   value: "value1"
+      #   effect: "NoSchedule"
 
       # -- Affinity rules
       # @section -- Workers
       affinity: {}
+      # podAntiAffinity:
+      #   requiredDuringSchedulingIgnoredDuringExecution:
+      #   - labelSelector:
+      #       matchExpressions:
+      #       - key: worker.name
+      #         operator: In
+      #         values: [example]
+      #     topologyKey: kubernetes.io/hostname
+
+      # -- Topology spread constraints
+      # @section -- Workers
+      topologySpreadConstraints: []
+      # - maxSkew: 1
+      #   topologyKey: kubernetes.io/hostname
+      #   whenUnsatisfiable: DoNotSchedule
+      #   labelSelector:
+      #     matchLabels:
+      #       worker.name: example
 
     # -- KEDA autoscaler configuration
     # @section -- Workers
@@ -1526,34 +1154,16 @@ workers:
       # -- Cooldown period in seconds
       # @section -- Workers
       cooldownPeriod: 300
-      # -- Target resource kind for scaling (Deployment, Job, etc.)
-      # @section -- Workers
-      scaleTargetKind: "Deployment"
-      # -- Target resource API version
-      # @section -- Workers
-      scaleTargetApiVersion: "apps/v1"
 
       # -- RabbitMQ trigger configuration for KEDA
       # @section -- Workers
       rabbitmq:
-        # -- RabbitMQ connection string
-        # @section -- Workers
-        address: "{{ include \"chart.brokerUrl\" . }}"
         # -- Queue name to monitor
         # @section -- Workers
-        listName: "worker-tasks"
+        queueName: "example_queue_in"
         # -- Target queue length to trigger scaling
         # @section -- Workers
-        listLength: "5"
-        # -- RabbitMQ password (if not using secretRef)
-        # @section -- Workers
-        password: ""
-        # -- Secret reference for RabbitMQ credentials
-        # @section -- Workers
-        secretRef: ""
-        # -- Secret key for RabbitMQ password
-        # @section -- Workers
-        secretKey: ""
+        queueLength: "5"
 
       # -- Advanced scaling behavior configuration
       # @section -- Workers
@@ -1607,10 +1217,7 @@ workers:
     metrics:
       # -- Enable metrics endpoint
       # @section -- Workers
-      enabled: true
-      # -- Metrics port
-      # @section -- Workers
-      port: 8080
+      enabled: false
       # -- Metrics endpoint path
       # @section -- Workers
       path: "/metrics"
@@ -1692,6 +1299,42 @@ workers:
       # -- Time to keep completed jobs (seconds)
       # @section -- Workers
       ttlSecondsAfterFinished: 100
+      # -- Job parallelism (number of pods running simultaneously)
+      # @section -- Workers
+      parallelism: 1
+      # -- Number of successful completions required
+      # @section -- Workers
+      completions: 1
+      # -- Completion mode for the job
+      # @section -- Workers
+      completionMode: NonIndexed
+      # -- Suspend the job
+      # @section -- Workers
+      suspend: false
+
+      # -- Service account name for the job pods
+      # @section -- Workers
+      serviceAccountName: ""
+
+      # -- Image pull secrets for the job
+      # @section -- Workers
+      imagePullSecrets: []
+      # - name: "my-registry-secret"
+
+      # -- Extra annotations for job pods
+      # @section -- Workers
+      extraAnnotations: {}
+
+      # -- Extra labels for job pods
+      # @section -- Workers
+      extraLabels: {}
+
+      # -- Container ports configuration
+      # @section -- Workers
+      ports:
+        # -- Health check port (used for probes if enabled)
+        # @section -- Workers
+        health: 8080
 
       # -- Resource configuration
       # @section -- Workers
@@ -1706,33 +1349,91 @@ workers:
       # -- Environment variables
       # @section -- Workers
       env:
-        - name: RABBITMQ_URL
-          value: "{{ include \"chart.brokerUrl\" . }}"
-        - name: DATABASE_URL
-          value: "{{ include \"chart.databaseUrl\" . }}"
-        - name: INPUT_QUEUE
-          value: "job-tasks"
-        - name: OUTPUT_QUEUE
-          value: "job-responses"
-        - name: WORKER_TYPE
-          value: "job-worker"
+        - name: IN_QUEUE_NAME
+          value: "example2_queue_in"
+        - name: OUT_QUEUE_NAME
+          value: "example2_queue_out"
         - name: LOG_LEVEL
           value: "INFO"
 
       # -- Environment variables from secrets
       # @section -- Workers
       envFromSecret: []
+      # - secretRef:
+      #     name: job-secret
+      # - secretRef:
+      #     name: database-secret
+      #     optional: true
 
       # -- Environment variables from config maps
       # @section -- Workers
       envFromConfigMap: []
+      # - configMapRef:
+      #     name: job-config
+      # - configMapRef:
+      #     name: shared-config
+      #     optional: true
 
-      # -- Security context
+      # -- Container security context
       # @section -- Workers
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+
+      # -- Pod security context
+      # @section -- Workers
+      podSecurityContext:
         fsGroup: 1000
+      # fsGroup: 1000
+      # runAsUser: 1000
+      # runAsGroup: 1000
+
+      # -- Pod annotations
+      # @section -- Workers
+      podAnnotations: {}
+
+      # -- Pod labels
+      # @section -- Workers
+      podLabels: {}
+
+      # -- Restart policy for job pods
+      # @section -- Workers
+      restartPolicy: OnFailure
+
+      # -- Node selector
+      # @section -- Workers
+      nodeSelector: {}
+      # kubernetes.io/os: linux
+
+      # -- Tolerations
+      # @section -- Workers
+      tolerations: []
+      # - key: "key1"
+      #   operator: "Equal"
+      #   value: "value1"
+      #   effect: "NoSchedule"
+
+      # -- Affinity rules
+      # @section -- Workers
+      affinity: {}
+      # podAntiAffinity:
+      #   requiredDuringSchedulingIgnoredDuringExecution:
+      #   - labelSelector:
+      #       matchExpressions:
+      #       - key: worker.name
+      #         operator: In
+      #         values: [job-worker]
+      #     topologyKey: kubernetes.io/hostname
+
+      # -- Topology spread constraints
+      # @section -- Workers
+      topologySpreadConstraints: []
+      # - maxSkew: 1
+      #   topologyKey: kubernetes.io/hostname
+      #   whenUnsatisfiable: DoNotSchedule
+      #   labelSelector:
+      #     matchLabels:
+      #       worker.name: job-worker
 
     # -- Deployment configuration (not used for jobs)
     # @section -- Workers
@@ -1747,16 +1448,10 @@ workers:
       idleReplicaCount: 0
       pollingInterval: 15
       cooldownPeriod: 120
-      scaleTargetKind: "Job"
-      scaleTargetApiVersion: "batch/v1"
 
       rabbitmq:
-        address: "{{ include \"chart.brokerUrl\" . }}"
-        listName: "job-tasks"
-        listLength: "2"
-        password: ""
-        secretRef: ""
-        secretKey: ""
+        queueName: "example2_queue_in"
+        queueLength: "2"
 
       behavior:
         scaleDown:
@@ -1791,7 +1486,7 @@ workers:
     # -- Metrics configuration
     # @section -- Workers
     metrics:
-      enabled: true
+      enabled: false
       port: 8080
       path: "/metrics"
       serviceMonitor:

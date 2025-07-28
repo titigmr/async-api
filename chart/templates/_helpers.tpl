@@ -1,12 +1,4 @@
 {{/*
-Expand the name of the chart.
-*/}}
-{{- define "helper.name" -}}
-{{- (.Values.nameOverride | default .Chart.Name) | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-
-{{/*
 Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
@@ -30,18 +22,6 @@ Create chart name and version as used by the chart label.
 */}}
 {{- define "helper.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-
-{{/*
-Create image pull secret
-*/}}
-{{- define "helper.imagePullSecret" }}
-{{- $registry := .registry -}}
-{{- $username := .username -}}
-{{- $password := .password -}}
-{{- $email := .email -}}
-{{- printf "{\"auths\":{\"%s\":{\"username\":\"%s\",\"password\":\"%s\",\"email\":\"%s\",\"auth\":\"%s\"}}}" $registry $username $password $email (printf "%s:%s" $username $password | b64enc) | b64enc }}
 {{- end }}
 
 
@@ -139,3 +119,38 @@ Parameters:
 {{ include "helper.commonLabels" $root }}
 {{ include "helper.selectorLabels" (dict "root" $root "componentName" $componentName) }}
 {{- end -}}
+
+
+{{/*
+PostgreSQL service name construction
+*/}}
+{{- define "chart.postgresql.fullname" -}}
+{{- if .Values.postgresql.fullnameOverride -}}
+{{- .Values.postgresql.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := .Values.postgresql.nameOverride | default "postgresql" -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+RabbitMQ service name construction
+*/}}
+{{- define "chart.rabbitmq.fullname" -}}
+{{- if .Values.rabbitmq.fullnameOverride -}}
+{{- .Values.rabbitmq.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := .Values.rabbitmq.nameOverride | default "rabbitmq" -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+

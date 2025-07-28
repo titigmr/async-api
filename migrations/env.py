@@ -1,5 +1,4 @@
 import asyncio
-import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -8,6 +7,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from api.core.config import Settings
 from api.core.database import Base
 from api.core.logger import logger
 
@@ -33,10 +33,10 @@ target_metadata = Base.metadata
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-# Set the sqlalchemy.url from environment variable if available
-database_url: str | None = os.getenv(key="DATABASE_URL")
-if database_url:
-    config.set_main_option(name="sqlalchemy.url", value=database_url)
+
+settings = Settings()
+database_url: str = settings.database_url_from_components.render_as_string(hide_password=False)
+config.set_main_option(name="sqlalchemy.url", value=database_url)
 
 
 def run_migrations_offline() -> None:

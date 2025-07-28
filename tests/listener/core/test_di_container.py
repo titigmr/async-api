@@ -6,5 +6,5 @@ from listener.services.queue_listener import QueueListener
 
 
 def test_di_container() -> None:
-    app = DIContainer(Settings()).app()
+    app = DIContainer(Settings()).queue_listener()
     assert isinstance(app, QueueListener)

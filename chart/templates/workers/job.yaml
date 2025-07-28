@@ -21,6 +21,18 @@ spec:
   {{- with .jobSpec.ttlSecondsAfterFinished }}
   ttlSecondsAfterFinished: {{ . }}
   {{- end }}
+  {{- with .jobSpec.parallelism }}
+  parallelism: {{ . }}
+  {{- end }}
+  {{- with .jobSpec.completions }}
+  completions: {{ . }}
+  {{- end }}
+  {{- with .jobSpec.completionMode }}
+  completionMode: {{ . }}
+  {{- end }}
+  {{- if hasKey .jobSpec "suspend" }}
+  suspend: {{ .jobSpec.suspend }}
+  {{- end }}
   template:
     metadata:
       annotations:
@@ -33,10 +45,10 @@ spec:
         worker.type: {{ .type }}
         async-api.io/worker-type: {{ .type }}
     spec:
-      {{- if .role.create }}
-      serviceAccountName: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+      {{- if .jobSpec.serviceAccountName }}
+      serviceAccountName: {{ .jobSpec.serviceAccountName }}
       {{- end }}
-      restartPolicy: Never
+      restartPolicy: {{ .jobSpec.restartPolicy | default "OnFailure" }}
       {{- with .jobSpec.securityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
@@ -45,15 +57,14 @@ spec:
       - name: worker
         image: "{{ .jobSpec.image.repository }}:{{ .jobSpec.image.tag }}"
         imagePullPolicy: {{ .jobSpec.image.pullPolicy }}
-        {{- if .jobSpec.env }}
-        env:
-        {{- range .jobSpec.env }}
-        - name: {{ .name }}
-          value: {{ tpl .value $ | quote }}
-        {{- end }}
-        {{- end }}
-        {{- if or .jobSpec.envFromSecret .jobSpec.envFromConfigMap }}
         envFrom:
+        {{- if not $.Values.broker.urlFromSecret.name }}
+        - secretRef:
+            name: {{ printf "%s-broker-worker" (include "helper.fullname" $) }}
+        {{- else }}
+        - secretRef:
+            name: {{ $.Values.broker.urlFromSecret.name }}
+        {{- end }}
         {{- range .jobSpec.envFromSecret }}
         - secretRef:
             name: {{ .secretRef.name }}
@@ -68,11 +79,19 @@ spec:
             optional: {{ .configMapRef.optional }}
             {{- end }}
         {{- end }}
+        env:
+        {{- if .jobSpec.env }}
+        {{- toYaml .jobSpec.env | nindent 8 }}
         {{- end }}
         {{- if .metrics.enabled }}
         ports:
+        {{- if .jobSpec.ports.health }}
+        - name: health
+          containerPort: {{ .jobSpec.ports.health | default 8080 }}
+          protocol: TCP
+        {{- end }}
         - name: metrics
-          containerPort: {{ .metrics.port }}
+          containerPort: {{ .jobSpec.ports.metrics | default 8080 }}
           protocol: TCP
         {{- end }}
         {{- with .jobSpec.resources }}
@@ -130,6 +149,26 @@ spec:
           {{- end }}
         {{- end }}
       {{- end }}
+      {{- end }}
+      {{- if .jobSpec.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .jobSpec.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .jobSpec.affinity }}
+      affinity:
+        {{- toYaml .jobSpec.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .jobSpec.tolerations }}
+      tolerations:
+        {{- toYaml .jobSpec.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .jobSpec.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .jobSpec.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+      {{- if .jobSpec.podSecurityContext }}
+      securityContext:
+        {{- toYaml .jobSpec.podSecurityContext | nindent 8 }}
       {{- end }}
 {{- end }}
 {{- end }}

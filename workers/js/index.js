@@ -1,33 +1,101 @@
 const amqp = require('amqplib');
+const http = require('http');
 const os = require('os');
 
 //------------------------
 // CONFIGURATION
 //------------------------
-const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672';
-const RABBITMQ_USER = process.env.RABBITMQ_USER || 'kalo';
-const RABBITMQ_PASSWORD = process.env.RABBITMQ_PASSWORD || 'kalo';
+const BROKER_URL = process.env.BROKER_URL || 'amqp://localhost';
 const LISTENER_COUNT = Number(process.env.LISTENER_COUNT) || 5;
 
 const IN_QUEUE_NAME = process.env.IN_QUEUE_NAME || 'example';
-const OUT_QUEUE_NAME = process.env.OUT_QUEUE_NAME ||'example_out';
+const OUT_QUEUE_NAME = process.env.OUT_QUEUE_NAME || 'example_out';
+const ENABLE_HEALTH_CHECK_SERVER = process.env.CONSUMER_ENABLE_HEALTH_CHECK_SERVER === 'true' || false; // Default to false if not set
+const HEALTH_CHECK_PORT = Number(process.env.CONSUMER_HEALTH_CHECK_PORT) || 8080;
+const HEALTH_CHECK_HOST = process.env.CONSUMER_HEALTH_CHECK_HOST || '0.0.0.0';
 
 //------------------------
 // FRAMEWORK
 //------------------------
 
+
+class HealthCheckServer {
+    constructor(port, host, taskManager) {
+        this.port = port;
+        this.host = host
+        this.taskManager = taskManager;
+        this.server = null;
+    }
+
+    async start() {
+        return new Promise((resolve, reject) => {
+            this.server = http.createServer((req, res) => {
+                let statusCode = 200;
+
+                try {
+                    if (req.url === '/health' && req.method === 'GET') {
+                        const response = {
+                            status: 'ok',
+                            timestamp: new Date().toISOString(),
+                            hostname: os.hostname()
+                        };
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify(response));
+                    } else if (req.url === '/ready' && req.method === 'GET') {
+                        const response = {
+                            status: 'ready',
+                            timestamp: new Date().toISOString(),
+                            hostname: os.hostname(),
+                            broker_connected: this.taskManager ? !this.taskManager.isShuttingDown : false
+                        };
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify(response));
+                    } else {
+                        statusCode = 404;
+                        res.writeHead(404, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Not Found' }));
+                    }
+                } finally {
+                    console.log(`[HealthCheck] ${req.method} ${req.url} ${statusCode} - ${req.headers['user-agent'] || 'Unknown'}`);
+                }
+            });
+            this.server.on('clientError', (err, socket) => {
+                console.error('[HealthCheck] Client error:', err.message);
+                socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+            });
+
+            this.server.listen(this.port, this.host, (err) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    console.log(`[HealthCheck] Server running at http://${this.host}:${this.port}/`);
+                    resolve();
+                }
+            });
+        });
+    }
+
+    async stop() {
+        if (this.server) {
+            return new Promise((resolve) => {
+                this.server.close(() => {
+                    console.log('[HealthCheck] Stop...');
+                    resolve();
+                });
+            });
+        }
+    }
+}
+
 // Utilitaire d'envoie de message (Started/End)
 class MessageSender {
-    constructor(rabbitmqUrl, rabbitmqUser, rabbitmqPassword, outQueue) {
-        this.rabbitmqUrl = rabbitmqUrl;
-        this.rabbitmqUser = rabbitmqUser;
-        this.rabbitmqPassword = rabbitmqPassword;
+    constructor(brokerUrl, outQueue) {
+        this.brokerUrl = brokerUrl;
         this.outQueue = outQueue;
     }
 
     async _sendMessage(message) {
-        const opt = { credentials: amqp.credentials.plain(this.rabbitmqUser, this.rabbitmqPassword) };
-        const connection = await amqp.connect(this.rabbitmqUrl,opt);
+        const connection = await amqp.connect(this.brokerUrl);
 
         const channel = await connection.createChannel();
         await channel.assertQueue(this.outQueue, { durable: true });
@@ -58,7 +126,7 @@ class MessageSender {
                 message_type: "success",
                 response: result
             }
-        }) 
+        })
     }
 
     async sendFailureMessage(task_id, cause) {
@@ -68,53 +136,52 @@ class MessageSender {
                 message_type: "failure",
                 error_message: cause
             }
-        }) 
-    }
-
-    async sendProgressMessage(task_id, progress) {
-        await this._sendMessage({
-            task_id: task_id,
-            data: {
-                message_type: "progress",
-                progress: progress
-            }
-        }) 
+        })
     }
 }
 
 // Consumer et exécution des tâches
 class TaskManager {
-    constructor(rabbitmqUrl, rabbitmqUser, rabbitmqPassword,inQueue, outQueue, parallelism, taskFactory,oneShot) {
-        this.rabbitmqUrl = rabbitmqUrl;
-        this.rabbitmqUser = rabbitmqUser;
-        this.rabbitmqPassword = rabbitmqPassword;
+    constructor(brokerUrl,inQueue, outQueue, parallelism, taskFactory, enableHealthCheckServer, healthCheckPort, healthCheckHost) {
+        this.brokerUrl = brokerUrl;
         this.inQueue = inQueue;
         this.outQueue = outQueue;
         this.parallelism = parallelism;
         this.taskFactory = taskFactory;
+        this.enableHealthCheckServer = enableHealthCheckServer;
+        this.healthCheckPort = healthCheckPort;
+        this.healthCheckHost = healthCheckHost;
+        this.healthCheckServer = null;
         // Etat interne
         this.channels = [];
         this.inFlightMessages = new Map(); // Map(channel -> msg)
         this.isShuttingDown = false;
-        this.messageSender = new MessageSender(rabbitmqUrl, rabbitmqUser, rabbitmqPassword, outQueue);
-        this.oneShot = oneShot;
+        this.messageSender = new MessageSender(brokerUrl, outQueue);
     }
 
     async start() {
         let connection = null;
         while (true) {
-            const opt = { credentials: amqp.credentials.plain(this.rabbitmqUser, this.rabbitmqPassword) };
             try {
-                connection = await amqp.connect(this.rabbitmqUrl,opt);
+                connection = await amqp.connect(this.brokerUrl);
                 break;
             } catch (error) {
-                console.log("Connection error, retry in 2s.")
+                console.log("[TaskManager] Connection error, retry in 2s.", error.message);
                 await sleepMs(2000)
+            }
+        }
+        if (this.enableHealthCheckServer) {
+            try {
+                this.healthCheckServer = new HealthCheckServer(this.healthCheckPort, this.healthCheckHost, this);
+                await this.healthCheckServer.start();
+            } catch (err) {
+                console.error('[HealthCheck] Erreur de démarrage du serveur de santé', err);
+                process.exit(1);
             }
         }
         // Gestion SIGTERM
         process.on('SIGTERM', async () => {
-            await this.shutdown(connection);
+        await this.shutdown(connection);
         });
         process.on('SIGINT', async () => {
             await this.shutdown(connection);
@@ -137,6 +204,7 @@ class TaskManager {
             );
         }
     }
+
 
     async onMessage(channelIndex,msg) {
         let channel = this.channels[channelIndex];
@@ -175,7 +243,7 @@ class TaskManager {
 
     parseSubmissionMessage(content) {
         try {
-            let json = JSON.parse(content); 
+            let json = JSON.parse(content);
             if (json.task_id && json.data && json.data.message_type && json.data.body) {
                 return json;
             } else {
@@ -193,6 +261,15 @@ class TaskManager {
         }
         console.log('SIGTERM reçu. Nettoyage en cours...');
         this.isShuttingDown=true;
+
+        // Arrêt du serveur de santé
+        if (this.healthCheckServer) {
+            try {
+                await this.healthCheckServer.stop();
+            } catch (err) {
+                console.error('[!] Échec d\'arrêt du serveur de santé', err);
+            }
+        }
 
         // Arret des channels sans message en cours.
         // On ne veut pas qu'un channel en attente
@@ -268,14 +345,14 @@ class MyTask {
 // EXECUTION
 //------------------------
 let taskManager = new TaskManager(
-    RABBITMQ_URL,
-    RABBITMQ_USER,
-    RABBITMQ_PASSWORD,
+    BROKER_URL,
     IN_QUEUE_NAME,
     OUT_QUEUE_NAME,
     LISTENER_COUNT,
     () => new MyTask(),
-    false
+    ENABLE_HEALTH_CHECK_SERVER,
+    HEALTH_CHECK_PORT,
+    HEALTH_CHECK_HOST
 );
 
 taskManager.start().catch((err) => {

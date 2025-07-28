@@ -1,4 +1,3 @@
-# Configuration des logs en premier pour intercepter uvicorn
 from fastapi import FastAPI
 
 from api.api.v1.routes import metrics, services, status, tasks
@@ -32,7 +31,7 @@ app = FastAPI(
     version=__version__,
     summary=settings.PROJECT_DESCRIPTION,
 )
-register_exception_handlers(app)
+register_exception_handlers(app=app)
 
 app.include_router(router=services.router, prefix="/v1", tags=["Services"])
 app.include_router(router=tasks.router, prefix="/v1", tags=["Tasks"])

@@ -3,7 +3,7 @@ import signal
 from contextvars import Context
 
 import aio_pika
-from aio_pika.abc import AbstractIncomingMessage
+from aio_pika.abc import AbstractChannel, AbstractIncomingMessage, AbstractRobustConnection
 
 from api.repositories.services_config_repository import ServicesConfigRepository
 from listener.core.logger import logger
@@ -15,16 +15,27 @@ class QueueListener:
         self,
         message_service: MessageService,
         service_repository: ServicesConfigRepository,
-        rabbitmq_url: str,
+        broker_kwargs: dict[str, str | int | None],
         concurrency: int = 20,
     ) -> None:
         self.service_repository: ServicesConfigRepository = service_repository
-        self.rabbit_url: str = rabbitmq_url
+        self.broker_kwargs: dict[str, str | int | None] = broker_kwargs
         self.message_service: MessageService = message_service
         self.concurrency: int = concurrency
 
         self.consumer_task: list[asyncio.Task] = []
         self.stop_event = asyncio.Event()
+
+    async def ping(self) -> None:
+        """Test the broker connection by establishing and closing a connection"""
+        try:
+            connection: AbstractRobustConnection = await aio_pika.connect_robust(**self.broker_kwargs)  # type: ignore[arg-type]
+            if connection.is_closed:
+                raise ConnectionError("Connection is closed")
+            await connection.close()
+        except Exception as e:
+            logger.error(f"Broker ping failed: {e}")
+            raise ConnectionError(f"Unable to connect to broker: {e}") from e
 
     async def process_message(
         self,
@@ -56,20 +67,21 @@ class QueueListener:
         while True:
             try:
                 logger.info("Connecting to rabbitmq...")
-                connection = await aio_pika.connect_robust(self.rabbit_url)
+                connection: AbstractRobustConnection = await aio_pika.connect_robust(**self.broker_kwargs)  # type: ignore[arg-type]
                 logger.info("Successfully connected.")
                 return connection  # type: ignore
             except Exception as e:
                 logger.error(f"Connection failure : {e}. Retry in 5s...")
-                await asyncio.sleep(5)
+                await asyncio.sleep(delay=5)
 
     async def start(self) -> None:
         logger.info(
             f"⏳ Connecting to the output queues (concurrency: {self.concurrency})...",
         )
-        connection = await self.wait_for_connection()
 
-        channel = await connection.channel()
+        connection: aio_pika.RobustConnection = await self.wait_for_connection()
+
+        channel: AbstractChannel = await connection.channel()
         await channel.set_qos(prefetch_count=self.concurrency)
 
         for service in self.service_repository.all_services().values():
@@ -80,11 +92,11 @@ class QueueListener:
             await queue.consume(
                 callback=lambda msg, svc=service.name: self.message_handler(message=msg, service_name=svc),
             )
-        logger.info("🤗 Done.")
+        logger.info("Done.")
 
-        loop = asyncio.get_running_loop()
-        loop.add_signal_handler(signal.SIGINT, self.stop)
-        loop.add_signal_handler(signal.SIGTERM, self.stop)
+        loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+        loop.add_signal_handler(sig=signal.SIGINT, callback=self.stop)
+        loop.add_signal_handler(sig=signal.SIGTERM, callback=self.stop)
 
         # Wait for a stop signal
         await self.stop_event.wait()

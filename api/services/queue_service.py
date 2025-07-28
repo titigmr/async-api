@@ -14,11 +14,11 @@ class QueueSenderError(Exception):
 
 class QueueSender:
     def __init__(self) -> None:
-        self.broker_url = settings.BROKER_URL
-        self.max_retries = settings.API_SENDER_RETRY
+        self.broker_kwargs: dict[str, str | int | None] = settings.broker_connection_kwargs
+        self.max_retries: int = settings.API_SENDER_RETRY
 
     async def ping(self) -> None:
-        connection = await aio_pika.connect_robust(self.broker_url)
+        connection = await aio_pika.connect_robust(**self.broker_kwargs)  # type: ignore[arg-type]
         if connection.is_closed:
             msg = "Not connected"
             raise QueueSenderError(msg)
@@ -35,7 +35,7 @@ class QueueSender:
         retry: int,
     ) -> None:
         try:
-            connection = await aio_pika.connect_robust(self.broker_url)
+            connection = await aio_pika.connect_robust(**self.broker_kwargs)  # type: ignore[arg-type]
             async with connection:
                 channel = await connection.channel()
                 await channel.declare_queue(name=queue, durable=True)

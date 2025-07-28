@@ -3,7 +3,7 @@ name = "AsyncTaskAPI"
 version = "0.1.0"
 description = "Generic api for async tasks"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.16.4",
     "fastapi>=0.116.1",
@@ -11,7 +11,7 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "pydantic-settings>=2.10.1",
     "requests>=2.32.4",
-    "sqlalchemy[asyncio]>=2.0.41",
+    "sqlalchemy[asyncio]>=2.0.42",
     "sqlmodel>=0.0.24",
     "toml>=0.10.2",
     "uvicorn>=0.35.0",
@@ -21,7 +21,7 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=7.1.0",
     "pyyaml>=6.0.2",
     "aio-pika>=9.5.5",
-    "aiohttp>=3.12.14",
+    "aiohttp>=3.12.15",
     "loguru>=0.7.3",
     "multidict>=6.6.3",
     "tenacity>=9.1.2",
@@ -59,7 +59,7 @@ exclude = [
 
 line-length = 120
 indent-width = 4
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 # See https://docs.astral.sh/ruff/rules/
