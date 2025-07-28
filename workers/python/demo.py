@@ -72,9 +72,9 @@ class MyAsyncTask(AsyncTaskInterface):
             time = body["sleep"]
             logger.info(f"Traitement en cours... ({time}s)")
             await asyncio.sleep(time/2)
-            progress(30.0)
+            await progress(30.0)
             await asyncio.sleep(time/2)
-            progress(30.0)
+            await progress(30.0)
         else:
             # Exception "fonctionnelle", le message ne sera pas retraité, la tâche aura le status failure
             raise Exception("Argh") 
@@ -85,11 +85,12 @@ async def main() -> None:
     logger.info("Launch")
     runner = AsyncWorkerRunner(
         # Rabbit mq connection
-        "amqp://kalo:kalo@127.0.0.1:5672",
+        amqp_url="amqp://kalo:kalo@127.0.0.1:5672",
         # In out queues
-        "in_queue_python","out_queue_python",
-        lambda:  MyAsyncTask(),
-        Infinite(5), # or OnShot(), 
+        amqp_in_queue="in_queue_python",
+        amqp_out_queue="out_queue_python",
+        task_provider=lambda:  MyAsyncTask(), # or  lambda:  MySyncTask()
+        worker_mode=Infinite(5), # or OnShot(), 
     )
     await runner.start()
     logger.info("Stopped.")
