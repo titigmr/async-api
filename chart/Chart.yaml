@@ -1,9 +1,9 @@
 apiVersion: v2
-name: taskapi
+name: task
 type: application
 version: 0.1.0
-appVersion: "0.1.0"
-description: A Helm chart to deploy TaskApi.
+appVersion: "v0.1.0"
+description: A Helm chart to deploy Task Manager Api.
 deprecated: false
 annotations: {}
 keywords: []

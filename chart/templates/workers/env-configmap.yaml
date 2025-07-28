@@ -1,0 +1,29 @@
+{{- range .Values.workers }}
+{{- if .enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-worker-%s-env-config" (include "helper.fullname" $) .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
+    worker.name: {{ .name }}
+    async-api.io/resource-type: configuration
+    async-api.io/type: environment
+  annotations:
+    async-api.io/note: "Broker variables are now provided via secrets"
+data:
+  WORKER_NAME: {{ .name | quote }}
+  WORKER_TYPE: {{ .type | quote }}
+  {{- if (and .deploymentSpec .deploymentSpec.env) }}
+  {{- range .deploymentSpec.env }}
+  {{- if not (hasPrefix "DB_" .name) }}
+  {{- if not (hasPrefix "BROKER_" .name) }}
+  {{ .name }}: {{ tpl .value $ | quote }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -20,7 +20,7 @@ spec:
     {{- end }}
   template:
     metadata:
-      {{- if or .Values.api.podAnnotations .Values.api.secrets .Values.api.env .Values.global.env .Values.global.secrets }}
+      {{- if or .Values.api.podAnnotations .Values.api.secrets .Values.api.env }}
       annotations:
         {{- include "helper.checksum" (list $ "/api/configmap.yaml") | nindent 8 }}
         {{- include "helper.checksum" (list $ "/api/secret.yaml") | nindent 8 }}
@@ -49,85 +49,6 @@ spec:
       initContainers: {{- tpl (toYaml .Values.api.initContainers) . | nindent 6 }}
       {{- end }}
       containers:
-      - name: listener
-        {{- if .Values.api.securityContext }}
-        securityContext: {{- toYaml .Values.api.securityContext | nindent 10 }}
-        {{- end }}
-        image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}"
-        imagePullPolicy: {{ .Values.api.image.pullPolicy }}
-        {{- if .Values.api.listener.command }}
-        command:
-        {{- range .Values.api.listener.command }}
-        - {{ . | quote }}
-        {{- end }}
-        {{- end }}
-        {{- if .Values.api.listener.args }}
-        args:
-        {{- range .Values.api.listener.args }}
-        - {{ . | quote }}
-        {{- end }}
-        {{- end }}
-        env:
-        - name: APP
-          value: listener
-        {{- if include "chart.databaseUrl" . }}
-        - name: DATABASE_URL
-          {{- if .Values.database.fromSecret.name }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.database.fromSecret.name }}
-              key: {{ .Values.database.fromSecret.key | default "DATABASE_URL" }}
-          {{- else }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ printf "%s-%s-%s" (include "helper.fullname" .) "api" "connection" }}
-              key: DATABASE_URL
-          {{- end }}
-        {{- end }}
-        {{- if include "chart.brokerUrl" . }}
-        - name: BROKER_URL
-          {{- if .Values.broker.fromSecret.name }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.broker.fromSecret.name }}
-              key: {{ .Values.broker.fromSecret.key | default "BROKER_URL" }}
-          {{- else }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ printf "%s-%s-%s" (include "helper.fullname" .) "api" "connection" }}
-              key: BROKER_URL
-          {{- end }}
-        {{- end }}
-        {{- if or .Values.api.listener.env .Values.global.env .Values.global.secrets .Values.global.secrets .Values.api.listener.envFrom }}
-        envFrom:
-        {{- if or .Values.api.listener.env .Values.global.env }}
-        - configMapRef:
-            name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
-        {{- end }}
-        {{- if or .Values.api.listener.secrets .Values.global.secrets }}
-        - secretRef:
-            name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
-        {{- end }}
-        {{- if .Values.api.listener.envFrom }}
-          {{- toYaml .Values.api.listener.envFrom | nindent 8 }}
-        {{- end }}
-        {{- end }}
-        {{- if .Values.api.listener.probes.startupProbe }}
-        startupProbe:
-        {{- toYaml .Values.api.listener.probes.startupProbe | nindent 8 }}
-        {{- end }}
-        {{- if .Values.api.listener.probes.readinessProbe }}
-        readinessProbe:
-        {{- toYaml .Values.api.listener.probes.readinessProbe | nindent 8 }}
-        {{- end }}
-        {{- if .Values.api.listener.probes.livenessProbe }}
-        livenessProbe:
-        {{- toYaml .Values.api.listener.probes.livenessProbe }}
-        {{- end }}
-        resources: {{- toYaml .Values.api.listener.resources | nindent 10 }}
-        {{- if .Values.api.listener.volumeMounts }}
-        volumeMounts: {{- toYaml .Values.api.listener.volumeMounts | nindent 8 }}
-        {{- end }}
       - name: api
         {{- if .Values.api.securityContext }}
         securityContext: {{- toYaml .Values.api.securityContext | nindent 10 }}
@@ -146,91 +67,179 @@ spec:
         - {{ . | quote }}
         {{- end }}
         {{- end }}
-        env:
-        {{- if include "chart.databaseUrl" . }}
-        - name: DATABASE_URL
-          {{- if .Values.database.fromSecret.name }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.database.fromSecret.name }}
-              key: {{ .Values.database.fromSecret.key | default "DATABASE_URL" }}
-          {{- else }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ printf "%s-%s-%s" (include "helper.fullname" .) "api" "connection" }}
-              key: DATABASE_URL
-          {{- end }}
-        {{- end }}
-        {{- if include "chart.brokerUrl" . }}
-        - name: BROKER_URL
-          {{- if .Values.broker.fromSecret.name }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.broker.fromSecret.name }}
-              key: {{ .Values.broker.fromSecret.key | default "BROKER_URL" }}
-          {{- else }}
-          valueFrom:
-            secretKeyRef:
-              name: {{ printf "%s-%s-%s" (include "helper.fullname" .) "api" "connection" }}
-              key: BROKER_URL
-          {{- end }}
-        {{- end }}
-        ports:
-        - containerPort: {{ .Values.api.containerPort }}
-          protocol: TCP
-        {{- if .Values.api.extraPorts }}
-          {{- toYaml .Values.api.extraPorts | nindent 8 }}
-        {{- end }}
-        {{- if or .Values.api.env .Values.global.env .Values.global.secrets .Values.global.secrets .Values.api.envFrom }}
         envFrom:
-        {{- if or .Values.api.env .Values.global.env }}
+        {{- if .Values.api.env }}
         - configMapRef:
             name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
         {{- end }}
-        {{- if or .Values.api.secrets .Values.global.secrets }}
+        {{- if .Values.api.secrets }}
         - secretRef:
             name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
         {{- end }}
         {{- if .Values.api.envFrom }}
           {{- toYaml .Values.api.envFrom | nindent 8 }}
         {{- end }}
+        {{- if .Values.database.urlFromSecret.name }}
+        - secretRef:
+            name: {{ .Values.database.urlFromSecret.name }}
+        {{- else if or .Values.database.url .Values.database.components.host .Values.postgresql.enabled }}
+        - secretRef:
+            name: {{ printf "%s-database" (include "helper.fullname" .) }}
         {{- end }}
-        {{- if .Values.api.probes.startupProbe.enabled }}
+        {{- if .Values.broker.urlFromSecret.name }}
+        - secretRef:
+            name: {{ .Values.broker.urlFromSecret.name }}
+        {{- else if or .Values.broker.url .Values.broker.components.host .Values.rabbitmq.enabled }}
+        - secretRef:
+            name: {{ printf "%s-broker" (include "helper.fullname" .) }}
+        {{- end }}
+        {{- if and .Values.postgresql.enabled (not .Values.postgresql.auth.password) (not .Values.database.urlFromSecret.name) }}
+        - secretRef:
+            name: {{ include "chart.postgresql.fullname" . }}
+        {{- end }}
+        {{- if and .Values.rabbitmq.enabled (not .Values.rabbitmq.auth.password) (not .Values.broker.urlFromSecret.name) }}
+        - secretRef:
+            name: {{ include "chart.rabbitmq.fullname" . }}
+        {{- end }}
+        env:
+        {{- if or .Values.config.services.content .Values.config.services.fromSecret.name }}
+        - name: SERVICES_CONFIG_FILE
+          value: {{ printf "%s/%s" .Values.config.mountPath (.Values.config.services.fromSecret.key | default "services.yaml") | quote }}
+        {{- end }}
+        {{- if or .Values.config.clients.content .Values.config.clients.fromSecret.name }}
+        - name: CLIENTS_CONFIG_FILE
+          value: {{ printf "%s/%s" .Values.config.mountPath (.Values.config.clients.fromSecret.key | default "clients.yaml") | quote }}
+        {{- end }}
+        {{- if .Values.api.probes.startupProbe }}
         startupProbe:
-          httpGet:
-            path: {{ .Values.api.probes.healthcheck.path }}
-            port: {{ .Values.api.probes.healthcheck.port | default .Values.api.containerPort }}
-          initialDelaySeconds: {{ .Values.api.probes.startupProbe.initialDelaySeconds }}
-          successThreshold: {{ .Values.api.probes.startupProbe.successThreshold }}
-          failureThreshold: {{ .Values.api.probes.startupProbe.failureThreshold }}
-          periodSeconds: {{ .Values.api.probes.startupProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.api.probes.startupProbe.timeoutSeconds }}
+          {{- toYaml .Values.api.probes.startupProbe | nindent 10 }}
         {{- end }}
-        {{- if .Values.api.probes.readinessProbe.enabled }}
+        {{- if .Values.api.probes.readinessProbe }}
         readinessProbe:
-          httpGet:
-            path: {{ .Values.api.probes.healthcheck.path }}
-            port: {{ .Values.api.probes.healthcheck.port | default .Values.api.containerPort }}
-          initialDelaySeconds: {{ .Values.api.probes.readinessProbe.initialDelaySeconds }}
-          successThreshold: {{ .Values.api.probes.readinessProbe.successThreshold }}
-          failureThreshold: {{ .Values.api.probes.readinessProbe.failureThreshold }}
-          periodSeconds: {{ .Values.api.probes.readinessProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.api.probes.readinessProbe.timeoutSeconds }}
+          {{- toYaml .Values.api.probes.readinessProbe | nindent 10 }}
         {{- end }}
-        {{- if .Values.api.probes.livenessProbe.enabled }}
+        {{- if .Values.api.probes.livenessProbe }}
         livenessProbe:
-          httpGet:
-            path: {{ .Values.api.probes.healthcheck.path }}
-            port: {{ .Values.api.probes.healthcheck.port | default .Values.api.containerPort }}
-          initialDelaySeconds: {{ .Values.api.probes.livenessProbe.initialDelaySeconds }}
-          successThreshold: {{ .Values.api.probes.livenessProbe.successThreshold }}
-          failureThreshold: {{ .Values.api.probes.livenessProbe.failureThreshold }}
-          periodSeconds: {{ .Values.api.probes.livenessProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.api.probes.livenessProbe.timeoutSeconds }}
+          {{- toYaml .Values.api.probes.livenessProbe | nindent 10 }}
         {{- end }}
         resources: {{- toYaml .Values.api.resources | nindent 10 }}
+        volumeMounts:
+        {{- if or .Values.config.services.content .Values.config.services.fromSecret.name }}
+        - name: services-config
+          mountPath: {{ printf "%s/%s" .Values.config.mountPath (.Values.config.services.fromSecret.key | default "services.yaml") }}
+          subPath: {{ .Values.config.services.fromSecret.key | default "services.yaml" }}
+          readOnly: true
+        {{- end }}
+        {{- if or .Values.config.clients.content .Values.config.clients.fromSecret.name }}
+        - name: clients-config
+          mountPath: {{ printf "%s/%s" .Values.config.mountPath (.Values.config.clients.fromSecret.key | default "clients.yaml") }}
+          subPath: {{ .Values.config.clients.fromSecret.key | default "clients.yaml" }}
+          readOnly: true
+        {{- end }}
+        {{- if or .Values.config.schemas.files .Values.config.schemas.fromSecret.name }}
+        - name: schemas-config
+          mountPath: {{ printf "%s/schemas" .Values.config.mountPath }}
+          readOnly: true
+        {{- end }}
         {{- if .Values.api.volumeMounts }}
-        volumeMounts: {{- toYaml .Values.api.volumeMounts | nindent 8 }}
+        {{- toYaml .Values.api.volumeMounts | nindent 8 }}
+        {{- end }}
+      - name: listener
+        {{- if .Values.api.securityContext }}
+        securityContext: {{- toYaml .Values.api.securityContext | nindent 10 }}
+        {{- end }}
+        image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+        {{- if .Values.api.listener.command }}
+        command:
+        {{- range .Values.api.listener.command }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.api.listener.args }}
+        args:
+        {{- range .Values.api.listener.args }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- end }}
+        envFrom:
+        {{- if .Values.api.listener.env }}
+        - configMapRef:
+            name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
+        {{- end }}
+        {{- if .Values.api.listener.secrets }}
+        - secretRef:
+            name: {{ printf "%s-%s" (include "helper.fullname" .) "api" }}
+        {{- end }}
+        {{- if .Values.api.listener.envFrom }}
+          {{- toYaml .Values.api.listener.envFrom | nindent 8 }}
+        {{- end }}
+        {{- if .Values.database.urlFromSecret.name }}
+        - secretRef:
+            name: {{ .Values.database.urlFromSecret.name }}
+        {{- else if or .Values.database.url .Values.database.components.host .Values.postgresql.enabled }}
+        - secretRef:
+            name: {{ printf "%s-database" (include "helper.fullname" .) }}
+        {{- end }}
+        {{- if .Values.broker.urlFromSecret.name }}
+        - secretRef:
+            name: {{ .Values.broker.urlFromSecret.name }}
+        {{- else if or .Values.broker.url .Values.broker.components.host .Values.rabbitmq.enabled }}
+        - secretRef:
+            name: {{ printf "%s-broker" (include "helper.fullname" .) }}
+        {{- end }}
+        {{- if and .Values.postgresql.enabled (not .Values.postgresql.auth.password) (not .Values.database.urlFromSecret.name) }}
+        - secretRef:
+            name: {{ include "chart.postgresql.fullname" . }}
+        {{- end }}
+        {{- if and .Values.rabbitmq.enabled (not .Values.rabbitmq.auth.password) (not .Values.broker.urlFromSecret.name) }}
+        - secretRef:
+            name: {{ include "chart.rabbitmq.fullname" . }}
+        {{- end }}
+        env:
+        - name: APP
+          value: listener
+        {{- if or .Values.config.services.content .Values.config.services.fromSecret.name }}
+        - name: SERVICES_CONFIG_FILE
+          value: {{ printf "%s/%s" .Values.config.mountPath (.Values.config.services.fromSecret.key | default "services.yaml") | quote }}
+        {{- end }}
+        {{- if or .Values.config.clients.content .Values.config.clients.fromSecret.name }}
+        - name: CLIENTS_CONFIG_FILE
+          value: {{ printf "%s/%s" .Values.config.mountPath (.Values.config.clients.fromSecret.key | default "clients.yaml") | quote }}
+        {{- end }}
+        {{- if .Values.api.listener.probes.startupProbe }}
+        startupProbe:
+          {{- toYaml .Values.api.listener.probes.startupProbe | nindent 10 }}
+        {{- end }}
+        {{- if .Values.api.listener.probes.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.api.listener.probes.readinessProbe | nindent 10 }}
+        {{- end }}
+        {{- if .Values.api.listener.probes.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.api.listener.probes.livenessProbe | nindent 10 }}
+        {{- end }}
+        resources: {{- toYaml .Values.api.listener.resources | nindent 10 }}
+        volumeMounts:
+        {{- if or .Values.config.services.content .Values.config.services.fromSecret.name }}
+        - name: services-config
+          mountPath: {{ printf "%s/%s" .Values.config.mountPath (.Values.config.services.fromSecret.key | default "services.yaml") }}
+          subPath: {{ .Values.config.services.fromSecret.key | default "services.yaml" }}
+          readOnly: true
+        {{- end }}
+        {{- if or .Values.config.clients.content .Values.config.clients.fromSecret.name }}
+        - name: clients-config
+          mountPath: {{ printf "%s/%s" .Values.config.mountPath (.Values.config.clients.fromSecret.key | default "clients.yaml") }}
+          subPath: {{ .Values.config.clients.fromSecret.key | default "clients.yaml" }}
+          readOnly: true
+        {{- end }}
+        {{- if or .Values.config.schemas.files .Values.config.schemas.fromSecret.name }}
+        - name: schemas-config
+          mountPath: {{ printf "%s/schemas" .Values.config.mountPath }}
+          readOnly: true
+        {{- end }}
+        {{- if .Values.api.listener.volumeMounts }}
+        {{- toYaml .Values.api.listener.volumeMounts | nindent 8 }}
         {{- end }}
       {{- if .Values.api.extraContainers }}
         {{- tpl (toYaml .Values.api.extraContainers) . | nindent 6 }}
@@ -247,7 +256,38 @@ spec:
       {{- if .Values.api.tolerations }}
       tolerations: {{- toYaml .Values.api.tolerations | nindent 6 }}
       {{- end }}
+      volumes:
+      {{- if or .Values.config.services.content .Values.config.services.fromSecret.name }}
+      - name: services-config
+        {{- if and .Values.config.services.content (not .Values.config.services.fromSecret.name) }}
+        configMap:
+          name: {{ if and .Values.config.services.fromSecret.name (ne .Values.config.services.fromSecret.name "") }}{{ .Values.config.services.fromSecret.name }}{{ else }}{{ printf "%s-%s" (include "helper.fullname" .) "services-config" }}{{ end }}
+        {{- else }}
+        secret:
+          secretName: {{ .Values.config.services.fromSecret.name }}
+        {{- end }}
+      {{- end }}
+      {{- if or .Values.config.clients.content .Values.config.clients.fromSecret.name }}
+      - name: clients-config
+        {{- if and .Values.config.clients.content (not .Values.config.clients.fromSecret.name) }}
+        configMap:
+          name: {{ if and .Values.config.clients.fromSecret.name (ne .Values.config.clients.fromSecret.name "") }}{{ .Values.config.clients.fromSecret.name }}{{ else }}{{ printf "%s-%s" (include "helper.fullname" .) "clients-config" }}{{ end }}
+        {{- else }}
+        secret:
+          secretName: {{ .Values.config.clients.fromSecret.name }}
+        {{- end }}
+      {{- end }}
+      {{- if or .Values.config.schemas.files .Values.config.schemas.fromSecret.name }}
+      - name: schemas-config
+        {{- if and .Values.config.schemas.files (not .Values.config.schemas.fromSecret.name) }}
+        configMap:
+          name: {{ if and .Values.config.schemas.fromSecret.name (ne .Values.config.schemas.fromSecret.name "") }}{{ .Values.config.schemas.fromSecret.name }}{{ else }}{{ printf "%s-%s" (include "helper.fullname" .) "schemas-config" }}{{ end }}
+        {{- else }}
+        secret:
+          secretName: {{ .Values.config.schemas.fromSecret.name }}
+        {{- end }}
+      {{- end }}
       {{- if .Values.api.volumes }}
-      volumes: {{- toYaml .Values.api.volumes | nindent 6 }}
+      {{- toYaml .Values.api.volumes | nindent 6 }}
       {{- end }}
 {{- end }}

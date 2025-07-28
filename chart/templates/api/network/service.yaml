@@ -13,7 +13,53 @@ spec:
     nodePort: {{ .Values.api.service.nodePort }}
     {{- end }}
     name: {{ .Values.api.service.portName | default "http" }}
-  {{- if .Values.api.service.extraPorts -}}
-  {{- toYaml .Values.api.service.extraPorts | nindent 2 -}}
+  {{- if .Values.api.service.extraPorts }}
+  {{- range .Values.api.service.extraPorts }}
+  {{- if ne .name ($.Values.api.service.portName | default "http") }}
+  - port: {{ .port }}
+    targetPort: {{ .targetPort | default .port }}
+    protocol: {{ .protocol | default "TCP" }}
+    {{- if and (eq $.Values.api.service.type "NodePort") .nodePort }}
+    nodePort: {{ .nodePort }}
+    {{- end }}
+    name: {{ .name }}
   {{- end }}
-  selector: {{- include "helper.selectorLabels" . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  selector: {{- include "helper.selectorLabels" (dict "root" . "componentName" "api") | nindent 4 }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-%s" (include "helper.fullname" .) "listener" }}
+  labels: {{- (include "helper.labels" (dict "root" . "componentName" "listener")) | nindent 4 }}
+  {{- if .Values.api.listener.service.annotations }}
+  annotations:
+    {{- toYaml .Values.api.listener.service.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.api.listener.service.type | default "ClusterIP" }}
+  ports:
+  - port: {{ .Values.api.listener.service.port | default 8081 }}
+    targetPort: {{ .Values.api.listener.service.targetPort | default 8081 }}
+    protocol: {{ .Values.api.listener.service.protocol | default "TCP" }}
+    {{- if eq (.Values.api.listener.service.type | default "ClusterIP") "NodePort" }}
+    nodePort: {{ .Values.api.listener.service.nodePort }}
+    {{- end }}
+    name: {{ .Values.api.listener.service.portName | default "health" }}
+  {{- if .Values.api.listener.service.extraPorts }}
+  {{- range .Values.api.listener.service.extraPorts }}
+  {{- if ne .name ($.Values.api.listener.service.portName | default "health") }}
+  - port: {{ .port }}
+    targetPort: {{ .targetPort | default .port }}
+    protocol: {{ .protocol | default "TCP" }}
+    {{- if and (eq ($.Values.api.listener.service.type | default "ClusterIP") "NodePort") .nodePort }}
+    nodePort: {{ .nodePort }}
+    {{- end }}
+    name: {{ .name }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  selector: {{- include "helper.selectorLabels" (dict "root" . "componentName" "api") | nindent 4 }}

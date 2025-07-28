@@ -1,7 +1,7 @@
 
 services:
   api:
-    image: api:latest
+    image: github.com/titigmr/asyncapi:v0.1.0
     container_name: api
     volumes:
       - ${PWD}/api:/app/api
@@ -21,8 +21,15 @@ services:
     environment:
       - APP=api
   listener:
-    image: api:latest
+    image: github.com/titigmr/asyncapi:v0.1.0
     container_name: listener
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     volumes:
       - ${PWD}/api:/app/api
       - ${PWD}/listener:/app/listener
@@ -39,13 +46,15 @@ services:
     environment:
       - APP=listener
   consumer:
-    image: consumer:latest
+    image: github.com/titigmr/consumer:v0.1.0
     container_name: consumer
     volumes:
-      - ${PWD}/workers/js/index.js:/app/index.js
+     - ${PWD}/workers/js/index.js:/app/index.js
     build:
       context: ./workers/js
       dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
     depends_on:
       - db
       - broker
@@ -73,7 +82,6 @@ services:
     ports:
       - 5672:5672
       - 15672:15672
-      - 8080:8080
     environment:
       RABBITMQ_DEFAULT_USER: kalo
       RABBITMQ_DEFAULT_PASS: kalo

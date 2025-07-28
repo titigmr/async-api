@@ -9,6 +9,13 @@ class ErrorEnum(StrEnum):
     SERVICE_UNAVAILABLE = "Service unavailable, please try again later"
 
 
+class ReadyStatus(StrEnum):
+    """Status codes for the readiness of the application."""
+
+    OK = "ok"
+    ERROR = "error"
+
+
 class TaskStatus(StrEnum):
     """Status codes for the application."""
 

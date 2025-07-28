@@ -1,12 +1,21 @@
 import asyncio
 import logging
+import os
 import sys
+from collections.abc import Awaitable, Callable
 from time import sleep
 from typing import Any
 
 from loguru import logger
 
-from worker import AsyncTaskInterface, AsyncWorkerRunner, HealthCheckConfig, Infinite, SyncTaskInterface
+from worker import (
+    AsyncTaskInterface,
+    AsyncWorkerRunner,
+    HealthCheckConfig,
+    IncomingMessage,
+    Infinite,
+    SyncTaskInterface,
+)
 
 
 # --------------------------------
@@ -17,7 +26,7 @@ from worker import AsyncTaskInterface, AsyncWorkerRunner, HealthCheckConfig, Inf
 class InterceptHandler(logging.Handler):
     """Handler pour intercepter les logs du module logging standard et les rediriger vers loguru"""
 
-    def emit(self, record: logging.LogRecord) -> None:
+    def emit(self, record: logging.LogRecord) -> None:  # noqa: PLR6301
         try:
             level = logger.level(record.levelname).name
         except ValueError:
@@ -37,16 +46,16 @@ logger.remove()
 logger.add(sys.stdout, level="INFO")
 
 
-# -------------------------
 # Implémentation de la task
 # "utilisateur" (Sync)
-# -------------------------
+
+
 class MySyncTask(SyncTaskInterface):
-    def execute(self, incoming_message, progress) -> Any:
-        task_id = incoming_message.task_id
+    def execute(self, incoming_message: IncomingMessage, progress: Callable[[float], None]) -> Any:  # noqa: ANN401 PLR6301
+        # task_id = incoming_message.task_id
         body: dict[Any, Any] = incoming_message.body
         logging.info("Task_id: {task_id}")
-        if body["must_succeed"]:
+        if body["mustSucceed"]:
             time = body["sleep"]
             logger.info(f"Traitement en cours... ({time}s)")
             sleep(time / 2)
@@ -64,35 +73,43 @@ class MySyncTask(SyncTaskInterface):
 # "utilisateur" (Async)
 # -------------------------
 class MyAsyncTask(AsyncTaskInterface):
-    async def execute(self, incoming_message, progress) -> Any:
-        task_id = incoming_message.task_id
+    async def execute(self, incoming_message: IncomingMessage, progress: Callable[[float], Awaitable]) -> Any:  # noqa: ANN401 PLR6301
+        # task_id = incoming_message.task_id
         body: dict[Any, Any] = incoming_message.body
 
-        if body["must_succeed"] == True:
+        if body["mustSucceed"]:
             time = body["sleep"]
             logger.info(f"Traitement en cours... ({time}s)")
             await asyncio.sleep(time / 2)
-            await progress(30.0)
+            await progress(0.3)
             await asyncio.sleep(time / 2)
-            await progress(30.0)
+            await progress(0.6)
         else:
             # Exception "fonctionnelle", le message ne sera pas retraité, la tâche aura le status failure
             raise Exception("Argh")
         return {"hello": "world"}  # Réponse
 
 
+OUT_QUEUE_NAME = os.environ.get("OUT_QUEUE_NAME", "example_out_queue")
+IN_QUEUE_NAME = os.environ.get("IN_QUEUE_NAME", "in_queue_python")
+BROKER_URL = os.environ.get("BROKER_URL", "")
+WORKER_CONCURRENCY: int = int(os.environ.get("WORKER_CONCURRENCY", default="5"))
+if not BROKER_URL:
+    raise ValueError("BROKER_URL environment variable is not set.")
+
+
 async def main() -> None:
     logger.info("Launch")
     runner = AsyncWorkerRunner(
         # Rabbit mq connection
-        amqp_url="amqp://kalo:kalo@127.0.0.1:5672",
+        amqp_url=BROKER_URL,
         # In out queues
-        amqp_in_queue="in_queue_python",
-        amqp_out_queue="out_queue_python",
-        task_provider=lambda: MyAsyncTask(),  # or  lambda:  MySyncTask()
-        worker_mode=Infinite(5),  # or OnShot(),
+        amqp_in_queue=IN_QUEUE_NAME,
+        amqp_out_queue=OUT_QUEUE_NAME,
+        task_provider=MyAsyncTask,  # or  lambda:  MySyncTask()
+        worker_mode=Infinite(concurrency=WORKER_CONCURRENCY),  # or OnShot(),
         # Optional : HealthCheck
-        health_check_config=HealthCheckConfig("0.0.0.0", 8000),  # or None
+        health_check_config=HealthCheckConfig(host="127.0.0.1", port=8000),  # or None
     )
     await runner.start()
     logger.info("Stopped.")

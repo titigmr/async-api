@@ -9,67 +9,53 @@ metadata:
   labels:
     {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
     worker.name: {{ .name }}
-    worker.type: {{ .type }}
+    async-api.io/type: worker
     async-api.io/worker-type: {{ .type }}
 spec:
-  {{- if not .kedaAutoscaler.enabled }}
+  {{- if not (and .kedaAutoscaler .kedaAutoscaler.enabled) }}
   replicas: {{ .deploymentSpec.replicas | default 1 }}
   {{- end }}
   selector:
     matchLabels:
-      {{- include "helper.selectorLabels" $ | nindent 6 }}
-      app.kubernetes.io/component: worker
+      {{- include "helper.selectorLabels" (dict "root" $ "componentName" "worker") | nindent 6 }}
       worker.name: {{ .name }}
   template:
     metadata:
       annotations:
-        {{- include "helper.checksum" (list $ "/api/secret.yaml") | nindent 8 }}
-        {{- include "helper.workerChecksum" (dict "root" $ "workerName" .name) | nindent 8 }}
-        {{- with .deploymentSpec.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- include "helper.checksum" (list $ "/workers/configmap.yaml") | nindent 8 }}
+        {{- include "helper.checksum" (list $ "/workers/secret.yaml") | nindent 8 }}
+        {{- include "helper.checksum" (list $ "/workers/broker-secret-worker.yaml") | nindent 8 }}
+        {{- if .extraAnnotations }}
+        {{- toYaml .extraAnnotations | nindent 8 }}
         {{- end }}
       labels:
-        {{- include "helper.selectorLabels" $ | nindent 8 }}
-        app.kubernetes.io/component: worker
+        {{- include "helper.selectorLabels" (dict "root" $ "componentName" "worker") | nindent 8 }}
         worker.name: {{ .name }}
-        worker.type: {{ .type }}
+        async-api.io/type: worker
         async-api.io/worker-type: {{ .type }}
-        {{- with .deploymentSpec.podLabels }}
-        {{- toYaml . | nindent 8 }}
+        {{- if .extraLabels }}
+        {{- toYaml .extraLabels | nindent 8 }}
         {{- end }}
     spec:
-      {{- if .role.create }}
-      serviceAccountName: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
+      {{- if .deploymentSpec.serviceAccountName }}
+      serviceAccountName: {{ .deploymentSpec.serviceAccountName }}
       {{- end }}
-      {{- with .deploymentSpec.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .deploymentSpec.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .deploymentSpec.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .deploymentSpec.securityContext }}
-      securityContext:
-        {{- toYaml . | nindent 8 }}
+      {{- if .deploymentSpec.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .deploymentSpec.imagePullSecrets | nindent 8 }}
       {{- end }}
       containers:
       - name: worker
-        image: "{{ .deploymentSpec.image.repository }}:{{ .deploymentSpec.image.tag }}"
-        imagePullPolicy: {{ .deploymentSpec.image.pullPolicy }}
-        {{- if .deploymentSpec.env }}
-        env:
-        {{- range .deploymentSpec.env }}
-        - name: {{ .name }}
-          value: {{ tpl .value $ | quote }}
-        {{- end }}
-        {{- end }}
-        {{- if or .deploymentSpec.envFromSecret .deploymentSpec.envFromConfigMap }}
+        image: {{ .deploymentSpec.image.repository }}:{{ .deploymentSpec.image.tag | default "latest" }}
+        imagePullPolicy: {{ .deploymentSpec.image.pullPolicy | default "IfNotPresent" }}
         envFrom:
+        {{- if not $.Values.broker.urlFromSecret.name }}
+        - secretRef:
+            name: {{ printf "%s-broker-worker" (include "helper.fullname" $) }}
+        {{- else }}
+        - secretRef:
+            name: {{ $.Values.broker.urlFromSecret.name }}
+        {{- end }}
         {{- range .deploymentSpec.envFromSecret }}
         - secretRef:
             name: {{ .secretRef.name }}
@@ -84,82 +70,60 @@ spec:
             optional: {{ .configMapRef.optional }}
             {{- end }}
         {{- end }}
-        {{- end }}
-        {{- if .metrics.enabled }}
         ports:
+        - name: health
+          containerPort: {{ .deploymentSpec.ports.health | default 8080 }}
+          protocol: TCP
+        {{- if and .metrics .metrics.enabled }}
         - name: metrics
-          containerPort: {{ .metrics.port }}
+          containerPort: {{ .deploymentSpec.ports.metrics | default 8080 }}
           protocol: TCP
         {{- end }}
-        {{- with .deploymentSpec.resources }}
-        resources:
-          {{- toYaml . | nindent 10 }}
+        env:
+        {{- if .deploymentSpec.env }}
+        {{- toYaml .deploymentSpec.env | nindent 8 }}
         {{- end }}
-        {{- if .extraVolumes }}
-        volumeMounts:
-        {{- range .extraVolumes }}
-        - name: {{ .name }}
-          mountPath: {{ .mountPath | default (printf "/mnt/%s" .name) }}
-          {{- if .subPath }}
-          subPath: {{ .subPath }}
-          {{- end }}
-          {{- if .readOnly }}
-          readOnly: {{ .readOnly }}
-          {{- end }}
+        {{- if .deploymentSpec.probes }}
+        {{- if .deploymentSpec.probes.startupProbe }}
+        startupProbe:
+          {{- toYaml .deploymentSpec.probes.startupProbe | nindent 10 }}
         {{- end }}
-        {{- end }}
-        {{- if .metrics.enabled }}
-        livenessProbe:
-          httpGet:
-            path: {{ .metrics.path }}
-            port: metrics
-          initialDelaySeconds: 30
-          periodSeconds: 10
+        {{- if .deploymentSpec.probes.readinessProbe }}
         readinessProbe:
-          httpGet:
-            path: {{ .metrics.path }}
-            port: metrics
-          initialDelaySeconds: 5
-          periodSeconds: 5
+          {{- toYaml .deploymentSpec.probes.readinessProbe | nindent 10 }}
         {{- end }}
-      {{- if .extraVolumes }}
-      volumes:
-      {{- range .extraVolumes }}
-      - name: {{ .name }}
-        {{- if .emptyDir }}
-        emptyDir:
-          {{- toYaml .emptyDir | nindent 10 }}
-        {{- else if .configMap }}
-        configMap:
-          name: {{ tpl .configMap.name $ }}
-          {{- if .configMap.items }}
-          items:
-            {{- toYaml .configMap.items | nindent 12 }}
-          {{- end }}
-          {{- if .configMap.defaultMode }}
-          defaultMode: {{ .configMap.defaultMode }}
-          {{- end }}
-        {{- else if .secret }}
-        secret:
-          secretName: {{ tpl .secret.secretName $ }}
-          {{- if .secret.items }}
-          items:
-            {{- toYaml .secret.items | nindent 12 }}
-          {{- end }}
-          {{- if .secret.defaultMode }}
-          defaultMode: {{ .secret.defaultMode }}
-          {{- end }}
-        {{- else if .persistentVolumeClaim }}
-        persistentVolumeClaim:
-          claimName: {{ .persistentVolumeClaim.claimName }}
-        {{- else if .hostPath }}
-        hostPath:
-          path: {{ .hostPath.path }}
-          {{- if .hostPath.type }}
-          type: {{ .hostPath.type }}
-          {{- end }}
+        {{- if .deploymentSpec.probes.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .deploymentSpec.probes.livenessProbe | nindent 10 }}
         {{- end }}
+        {{- end }}
+        {{- if .deploymentSpec.resources }}
+        resources:
+          {{- toYaml .deploymentSpec.resources | nindent 10 }}
+        {{- end }}
+        {{- if .deploymentSpec.securityContext }}
+        securityContext:
+          {{- toYaml .deploymentSpec.securityContext | nindent 10 }}
+        {{- end }}
+      {{- if .deploymentSpec.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .deploymentSpec.nodeSelector | nindent 8 }}
       {{- end }}
+      {{- if .deploymentSpec.affinity }}
+      affinity:
+        {{- toYaml .deploymentSpec.affinity | nindent 8 }}
+      {{- end }}
+      {{- if .deploymentSpec.tolerations }}
+      tolerations:
+        {{- toYaml .deploymentSpec.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .deploymentSpec.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml .deploymentSpec.topologySpreadConstraints | nindent 8 }}
+      {{- end }}
+      {{- if .deploymentSpec.podSecurityContext }}
+      securityContext:
+        {{- toYaml .deploymentSpec.podSecurityContext | nindent 8 }}
       {{- end }}
 {{- end }}
 {{- end }}

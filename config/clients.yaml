@@ -4,6 +4,6 @@
     # - service: all # all access
     #   quotas: 100 Quotas for each services
     - service: example
-      quotas: 100 
+      quotas: 100
     - service: example2
       # quotas: 100 # Default: No quotas

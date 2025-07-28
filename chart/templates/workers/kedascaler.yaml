@@ -1,6 +1,6 @@
 {{ if .Capabilities.APIVersions.Has "keda.sh/v1alpha1" -}}
 {{- range .Values.workers }}
-{{- if and .enabled .kedaAutoscaler.enabled }}
+{{- if and .enabled (and .kedaAutoscaler .kedaAutoscaler.enabled) }}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -44,16 +44,9 @@ spec:
     - type: rabbitmq
       metricType: AverageValue
       metadata:
-        address: {{ tpl .kedaAutoscaler.rabbitmq.address $ | quote }}
-        listName: {{ .kedaAutoscaler.rabbitmq.listName | quote }}
-        listLength: {{ .kedaAutoscaler.rabbitmq.listLength | quote }}
-        {{- if .kedaAutoscaler.rabbitmq.password }}
-        password: {{ .kedaAutoscaler.rabbitmq.password | quote }}
-        {{- end }}
-      {{- if and .kedaAutoscaler.rabbitmq.secretRef .kedaAutoscaler.rabbitmq.secretKey }}
-      authenticationRef:
-        name: {{ printf "%s-worker-%s-rabbitmq-auth" (include "helper.fullname" $) .name }}
-      {{- end }}
+        queueName: {{ .kedaAutoscaler.rabbitmq.queueName | quote }}
+        queueLength: {{ .kedaAutoscaler.rabbitmq.queueLength | default "10" | quote }}
+        hostFromEnv: BROKER_URL
 {{- end }}
 {{- end }}
 {{- end }}

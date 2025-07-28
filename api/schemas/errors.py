@@ -2,6 +2,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from api.core.logger import logger
+from api.schemas import ReadyComponent
+from api.schemas.enum import ReadyStatus
+from api.schemas.status import ReadyResponse
 
 
 class ErrorDetail(BaseModel):
@@ -85,6 +88,34 @@ class NotImplemented(AppException):
     status_code = 501
     number = 501001
     description = "Not implemented"
+
+
+class ReadyResponseError(AppException):
+    def __init__(self, status: str, components: dict[str, ReadyComponent], details: str | None = None) -> None:
+        super().__init__(details=details)
+        self.status: str = status
+        self.components: dict[str, ReadyComponent] = components
+
+
+class DependenciesNotReady(AppException):
+    status_code = 503
+    number = 503001
+    description = "Service dependencies are not ready"
+
+    def __init__(self, components: dict[str, ReadyComponent], details: str | None = None) -> None:
+        super().__init__(details=details)
+        self.components: dict[str, ReadyComponent] = components
+
+    def to_response(self) -> JSONResponse:
+        ready_response = ReadyResponse(
+            status=ReadyStatus.ERROR,
+            components=self.components,
+        )
+
+        return JSONResponse(
+            status_code=self.status_code,
+            content=ready_response.model_dump(),
+        )
 
 
 class BodyValidationError(AppException):
