@@ -3,7 +3,7 @@ import logging
 import sys
 from time import sleep
 from typing import Any
-from worker import AsyncWorkerRunner, AyncTaskInterface, Infinite, OnShot, SyncTaskInterface, TaskInterface
+from worker import AsyncTaskInterface, AsyncWorkerRunner, Infinite, OnShot, SyncTaskInterface
 from loguru import logger
 
 from worker import AsyncWorkerRunner, Infinite, TaskInterface
@@ -39,9 +39,9 @@ logger.add(sys.stdout, level="INFO")
 
 # -------------------------
 # Implémentation de la task
-# "utilisateur"
+# "utilisateur" (Sync)
 #-------------------------
-class MyTask(SyncTaskInterface):
+class MySyncTask(SyncTaskInterface):
     def execute(self, incoming_message, progress) -> Any:
         task_id = incoming_message.task_id
         body: dict[Any, Any] = incoming_message.body
@@ -59,6 +59,28 @@ class MyTask(SyncTaskInterface):
         return {"hello": "world"}  # Réponse
 
 
+#-------------------------
+# Implémentation de la task
+# "utilisateur" (Async)
+#-------------------------
+class MyAsyncTask(AsyncTaskInterface):
+    async def execute(self, incoming_message, progress) -> Any:
+        task_id = incoming_message.task_id
+        body: dict[Any,Any] = incoming_message.body
+
+        if body["must_succeed"] == True:
+            time = body["sleep"]
+            logger.info(f"Traitement en cours... ({time}s)")
+            await asyncio.sleep(time/2)
+            progress(30.0)
+            await asyncio.sleep(time/2)
+            progress(30.0)
+        else:
+            # Exception "fonctionnelle", le message ne sera pas retraité, la tâche aura le status failure
+            raise Exception("Argh") 
+        return { "hello": "world" } # Réponse
+
+
 async def main() -> None:
     logger.info("Launch")
     runner = AsyncWorkerRunner(
@@ -66,7 +88,7 @@ async def main() -> None:
         "amqp://kalo:kalo@127.0.0.1:5672",
         # In out queues
         "in_queue_python","out_queue_python",
-        lambda:  MyTask(),
+        lambda:  MyAsyncTask(),
         Infinite(5), # or OnShot(), 
     )
     await runner.start()

@@ -21,7 +21,7 @@ class IncomingMessage:
         self.task_id = task_id
         self.body = body
 
-class AyncTaskInterface:
+class AsyncTaskInterface:
     async def execute(self, _incoming_message: IncomingMessage, progress: Callable[[float], Awaitable]) -> Any:
         pass
 
@@ -29,7 +29,7 @@ class SyncTaskInterface:
     def execute(self, _incoming_message: IncomingMessage, progress: Callable[[float], None]) -> Any:
         pass
 
-type TaskInterface = AyncTaskInterface | SyncTaskInterface
+type TaskInterface = AsyncTaskInterface | SyncTaskInterface
 
 #--------------------------------------
 # Typed exceptions
@@ -188,9 +188,11 @@ class AsyncWorkerRunner:
                         logger.info("Impossible d'envoyer le progress... {e}")
 
                 task = self.task_provider()
-                if isinstance(task,AyncTaskInterface):
+                if isinstance(task,AsyncTaskInterface):
+                    logger.info(f"Running async task...")
                     result = await task.execute(incoming_message, progress_callback)
                 else:
+                    logger.info(f"Running sync task...")
                     result = await asyncio.to_thread(lambda: task.execute(incoming_message, progress_callback_sync))
                 return result
         except Exception as e:
