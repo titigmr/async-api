@@ -3,7 +3,7 @@ import logging
 import sys
 from time import sleep
 from typing import Any
-from worker import AsyncTaskInterface, AsyncWorkerRunner, Infinite, OnShot, SyncTaskInterface
+from worker import AsyncTaskInterface, AsyncWorkerRunner, HealthCheckConfig, Infinite, OnShot, SyncTaskInterface
 from loguru import logger
 
 from worker import AsyncWorkerRunner, Infinite, TaskInterface
@@ -91,6 +91,8 @@ async def main() -> None:
         amqp_out_queue="out_queue_python",
         task_provider=lambda:  MyAsyncTask(), # or  lambda:  MySyncTask()
         worker_mode=Infinite(5), # or OnShot(), 
+        # Optional : HealthCheck
+        health_check_config=HealthCheckConfig("0.0.0.0",8000) # or None
     )
     await runner.start()
     logger.info("Stopped.")

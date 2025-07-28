@@ -57,6 +57,47 @@ class Infinite:
 
 type WorkerMode = OnShot | Infinite
 
+# --------------------------------------
+# HealthCheck Server
+# --------------------------------------
+class HealthCheckConfig:
+    def __init__(self,host: str,port: int):
+        self.host = host
+        self.port = port
+
+class HealthCheckServer:
+
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
+
+    async def start(self):
+        server = await asyncio.start_server(self.handler_health_check, self.host, self.port)
+        await server.start_serving()
+
+    async def handler_health_check(self,reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        try:
+            await reader.readuntil(b'\r\n\r\n')
+        except asyncio.IncompleteReadError:
+            writer.close()
+            await writer.wait_closed()
+            return
+
+        body = '{"status": "ok"}'
+        response = (
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            f"{body}"
+        )
+
+        writer.write(response.encode())
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
 
 # --------------------------------------
 # Runner component
@@ -69,6 +110,7 @@ class AsyncWorkerRunner:
         amqp_out_queue: str,
         task_provider: Callable[[], TaskInterface],
         worker_mode: WorkerMode,
+        health_check_config: HealthCheckConfig | None = None
     ) -> None:
         self.amqp_url = amqp_url
         self.amqp_in_queue = amqp_in_queue
@@ -84,6 +126,7 @@ class AsyncWorkerRunner:
         self.consumer_task: list[asyncio.Task] = []
         self.stop_event = asyncio.Event()
         self.task_provider = task_provider
+        self.health_check_config = health_check_config
 
     async def start(self) -> None:
         logger.info("🛜 Connecting to rabbitmq...")
@@ -99,6 +142,11 @@ class AsyncWorkerRunner:
         loop = asyncio.get_running_loop()
         loop.add_signal_handler(signal.SIGINT, self.stop)
         loop.add_signal_handler(signal.SIGTERM, self.stop)
+
+        # HealthCheck
+        if self.health_check_config is not None:
+            server = HealthCheckServer(self.health_check_config.host,self.health_check_config.port)
+            await server.start()
 
         # Wait for a stop signal
         await self.stop_event.wait()
@@ -275,3 +323,6 @@ class AsyncWorkerRunner:
             except Exception as e:
                 logger.info(f"Connection failure : {e}. Retry in 5s...")
                 await asyncio.sleep(5)
+
+
+
