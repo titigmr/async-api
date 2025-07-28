@@ -5,6 +5,7 @@ from api.repositories.services_config_repository import ServicesConfigRepository
 from api.repositories.task_repository import TaskRepository
 from listener.core.logger import configure_logger, logger
 from listener.core.task_aware_async_session import TaskAwareAsyncSession
+from listener.services.health_check import HealthCheckServer
 from listener.services.message_service import MessageService
 from listener.services.notifier_service import NotificationService
 from listener.services.notifiers.amqp_notifier import AmqpNotifier
@@ -67,3 +68,8 @@ class DIContainer:
             rabbitmq_url=self.settings.BROKER_URL,
             concurrency=self.settings.LISTENER_CONCURRENCY,
         )
+    
+    def health_check(self) -> HealthCheckServer:
+        server = HealthCheckServer(self.settings.HEALTH_CHECK_HOST,
+                                   self.settings.HEALTH_CHECK_PORT)
+        return server

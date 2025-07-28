@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     LISTENER_LOG_LEVEL: str = "INFO"
     LISTENER_CONCURRENCY: int = 20
     LISTENER_NOTIFIER_RETRY: int = 3  # 0, 1:1s, 2:4s, 3:9s, ...
-
+    HEALTH_CHECK_HOST: str = "0.0.0.0"
+    HEALTH_CHECK_PORT: int = 8000
 
 settings = Settings()
 
