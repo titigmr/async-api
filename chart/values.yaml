@@ -8,40 +8,134 @@ fullnameOverride: ""
 # Database connection configuration
 # @section -- Database
 database:
-  # -- Database connection configuration
-  # If host is empty, uses internal PostgreSQL service when postgresql.enabled=true
-  host: ""  # Leave empty to use internal PostgreSQL
-  # host: "external-postgres.company.com"  # For external database
+  # -- Database host
+  host: ""
+  # -- Database port
   port: 5432
-  database: ""  # Defaults to postgresql.auth.database
-  username: ""  # Defaults to postgresql.auth.username
-  password: ""  # Defaults to postgresql.auth.password
+  # -- Database name
+  name: ""
+  # -- Database username
+  username: ""
+  # -- Database password (if not using passwordFromSecret)
+  password: ""
+  # -- Database scheme for URL construction
   scheme: "postgresql+asyncpg"
-  # -- Complete database URL (overrides individual components above)
-  url: ""
-  # -- Load from existing secret
-  fromSecret: {}
-  #  name: "database-secret"
-  #  key: "DATABASE_URL"
 
-# Message broker connection configuration
+  # -- Use existing secret for database password
+  passwordFromSecret: {}
+    # -- Name of existing secret containing database password
+    # name: ""
+    # -- Key in the secret containing the database password
+    # key: "password"
+
+# Message broker connection configuration with intelligent fallback strategy
 # @section -- Broker
 broker:
-  # -- Message broker connection configuration
-  # If host is empty, uses internal RabbitMQ service when rabbitmq.enabled=true
-  host: ""  # Leave empty to use internal RabbitMQ
-  # host: "external-rabbitmq.company.com"  # For external broker
+  # -- Broker host
+  host: ""
+  # -- Broker port
   port: 5672
-  username: ""  # Defaults to rabbitmq.auth.username
-  password: ""  # Defaults to rabbitmq.auth.password
-  scheme: "amqp"
+  # -- Broker username
+  username: ""
+  # -- Broker password
+  password: ""
+  # -- Virtual host for broker URL construction
   vhost: "/"
-  # -- Complete broker URL (overrides individual components above)
-  url: ""
-  # -- Load from existing secret
-  fromSecret: {}
-  #  name: "broker-secret"
-  #  key: "BROKER_URL"
+  # -- Broker scheme for URL construction
+  scheme: "amqp"
+
+  # -- Use existing secret for broker password
+  passwordFromSecret: {}
+    # -- Name of existing secret containing broker password
+    # name: ""
+    # -- Key in the secret containing the broker password
+    # key: "password"
+
+# Configuration files management
+# @section -- Config
+config:
+  # -- Services configuration file content or existing secret reference
+  # @section -- Config
+  services:
+    # -- Services configuration content (YAML format)
+    # -- If provided, will create a ConfigMap with this content
+    content:
+      - name: example
+        quotas: 1000
+        json_schema: ./config/schemas/example.json
+        in_queue: example_queue_in
+        out_queue: example_queue_out
+      - name: example2
+        # json_schema: ./schemas/example.json # Default: No schema
+        # quotas: 1000                        # Default: No quotas
+        # in_queue: example_queue_in          # Default: <svc>_queue_in
+        # out_queue: example_queue_out        # Default: <svc>_queue_out
+
+    # -- Use existing secret for services configuration (optional)
+    fromSecret: {}
+      # -- Name of existing secret containing services.yaml
+      # name: ""
+      # -- Key in the secret containing the services configuration
+      # key: "services.yaml"
+
+  # -- Clients configuration file content or existing secret reference
+  # @section -- Config
+  clients:
+    # -- Clients configuration content (YAML format)
+    # -- If provided, will create a ConfigMap with this content
+    content:
+      - client_id: client1
+        #client_secret: $CLIENT_SECRET_1
+        authorizations:
+          # - service: all # all access
+          #   quotas: 100  # Quotas for each services
+          - service: example
+            quotas: 100
+          - service: example2
+            # quotas: 100 # Default: No quotas
+
+    # -- Use existing secret for clients configuration (optional)
+    fromSecret: {}
+      # -- Name of existing secret containing clients.yaml
+      # name: ""
+      # -- Key in the secret containing the clients configuration
+      # key: "clients.yaml"
+
+  # -- JSON Schema files configuration
+  # @section -- Config
+  schemas:
+    # -- List of JSON schema files to mount
+    # -- Each entry will create a file in /app/config/schemas/
+    files:
+      - name: "example.json"
+        content: |
+          {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "properties": {
+              "sleep": {
+                "type": "integer",
+                "description": "Durée d'attente en secondes"
+              },
+              "mustSucceed": {
+                "type": "boolean",
+                "description": "Indique si la tâche doit réussir"
+              }
+            },
+            "required": ["sleep"],
+            "additionalProperties": false
+          }
+
+    # -- Alternative: Use existing secret for schemas
+    fromSecret: {}
+      # -- Name of existing secret containing schema files
+      # name: ""
+      # -- List of keys in the secret (each key will be mounted as a file)
+      # keys: []
+
+  # -- Mount path for configuration files in containers
+  # @section -- Config
+  mountPath: "/app/config"
 
 global:
   # -- Map of environment variables to inject into all containers.
@@ -99,7 +193,6 @@ api:
   config:
     # @ section -- Api.config
     # Configuration for the api.
-    env: {}
 
   ingress:
     # -- Whether or not ingress should be enabled.
@@ -170,7 +263,7 @@ api:
   #       name: config
   # -- Api container port.
   # @section -- Api
-  containerPort: 8080
+  containerPort: 8000
   # -- Api extra container ports.
   # @section -- Api
   extraPorts: []
@@ -206,12 +299,19 @@ api:
   secrets: {}
   probes:
     healthcheck:
-      # -- Api container healthcheck endpoint.
+      # -- Api container healthcheck endpoint for liveness probe.
       # @section -- Api
-      path: "/"
+      path: "/internal/health"
       # -- Port to use for healthcheck (defaults to container port if not set)
       # @section -- Api
-      port: 8080
+      port: 8000
+    readiness:
+      # -- Api container readiness endpoint for startup and readiness probes.
+      # @section -- Api
+      path: "/internal/ready"
+      # -- Port to use for readiness check (defaults to container port if not set)
+      # @section -- Api
+      port: 8000
     startupProbe:
       # -- Whether or not enable the probe.
       # @section -- Api
@@ -224,7 +324,7 @@ api:
       successThreshold: 1
       # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
       # @section -- Api
-      failureThreshold: 10
+      failureThreshold: 30
       # -- How often (in seconds) to perform the probe.
       # @section -- Api
       periodSeconds: 10
@@ -237,13 +337,13 @@ api:
       enabled: true
       # -- Number of seconds after the container has started before probe is initiated.
       # @section -- Api
-      initialDelaySeconds: 10
+      initialDelaySeconds: 5
       # -- Minimum consecutive successes for the probe to be considered successful after having failed.
       # @section -- Api
-      successThreshold: 2
+      successThreshold: 1
       # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
       # @section -- Api
-      failureThreshold: 2
+      failureThreshold: 3
       # -- How often (in seconds) to perform the probe.
       # @section -- Api
       periodSeconds: 10
@@ -350,7 +450,7 @@ api:
     type: "ClusterIP"
     # -- Port used by the service.
     # @section -- Api
-    port: 80
+    port: 8080
     # -- Port used when type is `NodePort` to expose the service on the given node port.
     # @section -- Api
     nodePort: 31000
@@ -785,7 +885,7 @@ worker:
   #       name: config
   # -- Worker container port.
   # @section -- Worker
-  containerPort: 8080
+  containerPort: 8000
   # -- Worker extra container ports.
   # @section -- Worker
   extraPorts: []
@@ -826,7 +926,7 @@ worker:
       path: "/"
       # -- Port to use for healthcheck (defaults to container port if not set)
       # @section -- Worker
-      port: 8080
+      port: 8000
     startupProbe:
       # -- Whether or not enable the probe.
       # @section -- Worker
@@ -1443,10 +1543,6 @@ workers:
       # -- Environment variables as key-value pairs
       # @section -- Workers
       env:
-        - name: RABBITMQ_URL
-          value: "{{ include \"chart.brokerUrl\" . }}"
-        - name: DATABASE_URL
-          value: "{{ include \"chart.databaseUrl\" . }}"
         - name: INPUT_QUEUE
           value: "worker-tasks"
         - name: OUTPUT_QUEUE
@@ -1456,7 +1552,7 @@ workers:
         - name: LOG_LEVEL
           value: "INFO"
 
-      # -- Environment variables from secrets
+      # -- Environment variables from secrets (database and broker URLs will be injected automatically)
       # @section -- Workers
       envFromSecret: []
       # - secretRef:
@@ -1536,24 +1632,12 @@ workers:
       # -- RabbitMQ trigger configuration for KEDA
       # @section -- Workers
       rabbitmq:
-        # -- RabbitMQ connection string
-        # @section -- Workers
-        address: "{{ include \"chart.brokerUrl\" . }}"
         # -- Queue name to monitor
         # @section -- Workers
         listName: "worker-tasks"
         # -- Target queue length to trigger scaling
         # @section -- Workers
         listLength: "5"
-        # -- RabbitMQ password (if not using secretRef)
-        # @section -- Workers
-        password: ""
-        # -- Secret reference for RabbitMQ credentials
-        # @section -- Workers
-        secretRef: ""
-        # -- Secret key for RabbitMQ password
-        # @section -- Workers
-        secretKey: ""
 
       # -- Advanced scaling behavior configuration
       # @section -- Workers
@@ -1607,7 +1691,7 @@ workers:
     metrics:
       # -- Enable metrics endpoint
       # @section -- Workers
-      enabled: true
+      enabled: false
       # -- Metrics port
       # @section -- Workers
       port: 8080
@@ -1706,10 +1790,6 @@ workers:
       # -- Environment variables
       # @section -- Workers
       env:
-        - name: RABBITMQ_URL
-          value: "{{ include \"chart.brokerUrl\" . }}"
-        - name: DATABASE_URL
-          value: "{{ include \"chart.databaseUrl\" . }}"
         - name: INPUT_QUEUE
           value: "job-tasks"
         - name: OUTPUT_QUEUE
@@ -1751,12 +1831,8 @@ workers:
       scaleTargetApiVersion: "batch/v1"
 
       rabbitmq:
-        address: "{{ include \"chart.brokerUrl\" . }}"
         listName: "job-tasks"
         listLength: "2"
-        password: ""
-        secretRef: ""
-        secretKey: ""
 
       behavior:
         scaleDown:
@@ -1791,7 +1867,7 @@ workers:
     # -- Metrics configuration
     # @section -- Workers
     metrics:
-      enabled: true
+      enabled: false
       port: 8080
       path: "/metrics"
       serviceMonitor:

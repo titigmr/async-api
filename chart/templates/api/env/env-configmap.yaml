@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "helper.fullname" . }}-env-config
+  labels:
+    {{- include "helper.labels" (dict "root" . "componentName" "api") | nindent 4 }}
+    app.kubernetes.io/component: configuration
+    async-api.io/type: environment
+data:
+  DB_HOST: {{ include "chart.databaseHost" . | quote }}
+  DB_PORT: {{ include "chart.databasePort" . | quote }}
+  DB_NAME: {{ include "chart.databaseName" . | quote }}
+  DB_USERNAME: {{ include "chart.databaseUsername" . | quote }}
+  DB_SCHEME: {{ include "chart.databaseScheme" . | quote }}
+  BROKER_HOST: {{ include "chart.brokerHost" . | quote }}
+  BROKER_PORT: {{ include "chart.brokerPort" . | quote }}
+  BROKER_USERNAME: {{ include "chart.brokerUsername" . | quote }}
+  BROKER_VHOST: {{ include "chart.brokerVhost" . | quote }}
+  BROKER_SCHEME: {{ include "chart.brokerScheme" . | quote }}

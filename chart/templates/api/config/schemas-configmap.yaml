@@ -1,0 +1,15 @@
+{{- if and .Values.config.schemas.files (not .Values.config.schemas.fromSecret.name) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ if and .Values.config.schemas.fromSecret.name (ne .Values.config.schemas.fromSecret.name "") }}{{ .Values.config.schemas.fromSecret.name }}{{ else }}{{ printf "%s-%s" (include "helper.fullname" .) "schemas-config" }}{{ end }}
+  labels:
+    {{- include "helper.labels" (dict "root" . "componentName" "config") | nindent 4 }}
+    app.kubernetes.io/component: configuration
+    async-api.io/config-type: schemas
+data:
+{{- range .Values.config.schemas.files }}
+  {{ .name }}: |
+{{ .content | indent 4 }}
+{{- end }}
+{{- end -}}

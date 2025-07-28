@@ -1,5 +1,5 @@
 {{- range .Values.workers }}
-{{- if and .enabled .role.create }}
+{{- if and .enabled (and .role .role.create) }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -22,10 +22,12 @@ metadata:
     worker.name: {{ .name }}
     async-api.io/resource-type: role
 rules:
+{{- if .role.rules }}
 {{- range .role.rules }}
 - apiGroups: {{ .apiGroups | toJson }}
   resources: {{ .resources | toJson }}
   verbs: {{ .verbs | toJson }}
+{{- end }}
 {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

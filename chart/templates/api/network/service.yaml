@@ -13,7 +13,17 @@ spec:
     nodePort: {{ .Values.api.service.nodePort }}
     {{- end }}
     name: {{ .Values.api.service.portName | default "http" }}
-  {{- if .Values.api.service.extraPorts -}}
-  {{- toYaml .Values.api.service.extraPorts | nindent 2 -}}
+  {{- if .Values.api.service.extraPorts }}
+  {{- range .Values.api.service.extraPorts }}
+  {{- if ne .name ($.Values.api.service.portName | default "http") }}
+  - port: {{ .port }}
+    targetPort: {{ .targetPort | default .port }}
+    protocol: {{ .protocol | default "TCP" }}
+    {{- if and (eq $.Values.api.service.type "NodePort") .nodePort }}
+    nodePort: {{ .nodePort }}
+    {{- end }}
+    name: {{ .name }}
   {{- end }}
-  selector: {{- include "helper.selectorLabels" . | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  selector: {{- include "helper.selectorLabels" (dict "root" . "componentName" "api") | nindent 4 }}

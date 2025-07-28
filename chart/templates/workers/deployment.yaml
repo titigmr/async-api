@@ -12,8 +12,8 @@ metadata:
     worker.type: {{ .type }}
     async-api.io/worker-type: {{ .type }}
 spec:
-  {{- if not .kedaAutoscaler.enabled }}
-  replicas: {{ .deploymentSpec.replicas | default 1 }}
+  {{- if not (and .kedaAutoscaler .kedaAutoscaler.enabled) }}
+  replicas: {{ (and .deploymentSpec .deploymentSpec.replicas) | default 1 }}
   {{- end }}
   selector:
     matchLabels:
@@ -25,8 +25,8 @@ spec:
       annotations:
         {{- include "helper.checksum" (list $ "/api/secret.yaml") | nindent 8 }}
         {{- include "helper.workerChecksum" (dict "root" $ "workerName" .name) | nindent 8 }}
-        {{- with .deploymentSpec.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- if (and .deploymentSpec .deploymentSpec.podAnnotations) }}
+        {{- toYaml .deploymentSpec.podAnnotations | nindent 8 }}
         {{- end }}
       labels:
         {{- include "helper.selectorLabels" $ | nindent 8 }}
@@ -34,49 +34,38 @@ spec:
         worker.name: {{ .name }}
         worker.type: {{ .type }}
         async-api.io/worker-type: {{ .type }}
-        {{- with .deploymentSpec.podLabels }}
-        {{- toYaml . | nindent 8 }}
+        {{- if (and .deploymentSpec .deploymentSpec.podLabels) }}
+        {{- toYaml .deploymentSpec.podLabels | nindent 8 }}
         {{- end }}
     spec:
-      {{- if .role.create }}
+      {{- if (and .role .role.create) }}
       serviceAccountName: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
       {{- end }}
-      {{- with .deploymentSpec.nodeSelector }}
+      {{- if (and .deploymentSpec .deploymentSpec.nodeSelector) }}
       nodeSelector:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .deploymentSpec.nodeSelector | nindent 8 }}
       {{- end }}
-      {{- with .deploymentSpec.tolerations }}
+      {{- if (and .deploymentSpec .deploymentSpec.tolerations) }}
       tolerations:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .deploymentSpec.tolerations | nindent 8 }}
       {{- end }}
-      {{- with .deploymentSpec.affinity }}
+      {{- if (and .deploymentSpec .deploymentSpec.affinity) }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .deploymentSpec.affinity | nindent 8 }}
       {{- end }}
-      {{- with .deploymentSpec.securityContext }}
+      {{- if (and .deploymentSpec .deploymentSpec.securityContext) }}
       securityContext:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .deploymentSpec.securityContext | nindent 8 }}
       {{- end }}
       containers:
       - name: worker
-        image: "{{ .deploymentSpec.image.repository }}:{{ .deploymentSpec.image.tag }}"
-        imagePullPolicy: {{ .deploymentSpec.image.pullPolicy }}
-        {{- if .deploymentSpec.env }}
-        env:
-        {{- range .deploymentSpec.env }}
-        - name: {{ .name }}
-          value: {{ tpl .value $ | quote }}
-        {{- end }}
-        {{- end }}
-        {{- if or .deploymentSpec.envFromSecret .deploymentSpec.envFromConfigMap }}
+        image: "{{ (((.deploymentSpec).image).repository | default ((($.Values.global).image).repository) | default "async-api") }}:{{ (((.deploymentSpec).image).tag | default ((($.Values.global).image).tag) | default "latest") }}"
+        imagePullPolicy: {{ (((.deploymentSpec).image).pullPolicy | default ((($.Values.global).image).pullPolicy) | default "IfNotPresent") }}
         envFrom:
-        {{- range .deploymentSpec.envFromSecret }}
-        - secretRef:
-            name: {{ .secretRef.name }}
-            {{- if .secretRef.optional }}
-            optional: {{ .secretRef.optional }}
-            {{- end }}
-        {{- end }}
+        # Load worker-specific environment variables from ConfigMap (includes BROKER_URL)
+        - configMapRef:
+            name: {{ printf "%s-worker-%s-env-config" (include "helper.fullname" $) .name }}
+        {{- if (and .deploymentSpec .deploymentSpec.envFromConfigMap) }}
         {{- range .deploymentSpec.envFromConfigMap }}
         - configMapRef:
             name: {{ .configMapRef.name }}
@@ -85,15 +74,38 @@ spec:
             {{- end }}
         {{- end }}
         {{- end }}
-        {{- if .metrics.enabled }}
+        {{- if (and .deploymentSpec .deploymentSpec.envFromSecret) }}
+        {{- range .deploymentSpec.envFromSecret }}
+        - secretRef:
+            name: {{ .secretRef.name }}
+            {{- if .secretRef.optional }}
+            optional: {{ .secretRef.optional }}
+            {{- end }}
+        {{- end }}
+        {{- end }}
+        env:
+        - name: BROKER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "chart.brokerPasswordSecretName" $ }}
+              key: {{ include "chart.brokerPasswordSecretKey" $ }}
+        {{- if (and .deploymentSpec .deploymentSpec.env) }}
+        {{- range .deploymentSpec.env }}
+        - name: {{ .name }}
+          value: {{ tpl .value $ | quote }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- if (and .metrics .metrics.enabled) }}
         ports:
         - name: metrics
           containerPort: {{ .metrics.port }}
           protocol: TCP
         {{- end }}
-        {{- with .deploymentSpec.resources }}
+        {{- if (and .deploymentSpec .deploymentSpec.resources) }}
         resources:
-          {{- toYaml . | nindent 10 }}
+          {{- toYaml .deploymentSpec.resources | nindent 10 }}
         {{- end }}
         {{- if .extraVolumes }}
         volumeMounts:
@@ -108,7 +120,7 @@ spec:
           {{- end }}
         {{- end }}
         {{- end }}
-        {{- if .metrics.enabled }}
+        {{- if (and .metrics .metrics.enabled) }}
         livenessProbe:
           httpGet:
             path: {{ .metrics.path }}
@@ -160,6 +172,4 @@ spec:
           {{- end }}
         {{- end }}
       {{- end }}
-      {{- end }}
-{{- end }}
 {{- end }}

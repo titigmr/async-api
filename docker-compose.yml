@@ -1,7 +1,7 @@
 
 services:
   api:
-    image: api:latest
+    image: github.com/titigmr/asyncapi:v0.1.0
     container_name: api
     volumes:
       - ${PWD}/api:/app/api
@@ -21,7 +21,7 @@ services:
     environment:
       - APP=api
   listener:
-    image: api:latest
+    image: github.com/titigmr/asyncapi:v0.1.0
     container_name: listener
     volumes:
       - ${PWD}/api:/app/api
@@ -39,7 +39,7 @@ services:
     environment:
       - APP=listener
   consumer:
-    image: consumer:latest
+    image: github.com/titigmr/consumer:v0.1.0
     container_name: consumer
     volumes:
       - ${PWD}/workers/js/index.js:/app/index.js

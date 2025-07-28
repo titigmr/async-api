@@ -92,7 +92,7 @@ async def main() -> None:
         task_provider=lambda: MyAsyncTask(),  # or  lambda:  MySyncTask()
         worker_mode=Infinite(5),  # or OnShot(),
         # Optional : HealthCheck
-        health_check_config=HealthCheckConfig("0.0.0.0", 8000),  # or None
+        health_check_config=HealthCheckConfig("127.0.0.1", 8000),  # or None
     )
     await runner.start()
     logger.info("Stopped.")
