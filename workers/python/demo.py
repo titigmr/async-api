@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import sys
+from time import sleep
 from typing import Any
-
+from worker import AsyncWorkerRunner, AyncTaskInterface, Infinite, OnShot, SyncTaskInterface, TaskInterface
 from loguru import logger
 
 from worker import AsyncWorkerRunner, Infinite, TaskInterface
@@ -39,20 +40,19 @@ logger.add(sys.stdout, level="INFO")
 # -------------------------
 # Implémentation de la task
 # "utilisateur"
-# -------------------------
-class MyTask(TaskInterface):
-    async def execute(self, incoming_message, progress) -> Any:
+#-------------------------
+class MyTask(SyncTaskInterface):
+    def execute(self, incoming_message, progress) -> Any:
         task_id = incoming_message.task_id
         body: dict[Any, Any] = incoming_message.body
         logging.info("Task_id: {task_id}")
         if body["must_succeed"]:
             time = body["sleep"]
             logger.info(f"Traitement en cours... ({time}s)")
-            await asyncio.sleep(time / 3)  # Facultatif
-            await progress(30.0)
-            await asyncio.sleep(time / 3)  # Facultatif
-            await progress(60.0)
-            await asyncio.sleep(time / 3)  # Facultatif
+            sleep(time/2)
+            progress(30.0)
+            sleep(time/2)
+            progress(30.0)
         else:
             # Exception "fonctionnelle", le message ne sera pas retraité, la tâche aura le status failure
             raise Exception("Argh")
@@ -65,14 +65,13 @@ async def main() -> None:
         # Rabbit mq connection
         "amqp://kalo:kalo@127.0.0.1:5672",
         # In out queues
-        "in_queue_python",
-        "out_queue_python",
-        lambda: MyTask(),
-        Infinite(1),  # or OnShot(),
+        "in_queue_python","out_queue_python",
+        lambda:  MyTask(),
+        Infinite(5), # or OnShot(), 
     )
     await runner.start()
     logger.info("Stopped.")
 
-
+# Main
 if __name__ == "__main__":
     asyncio.run(main())

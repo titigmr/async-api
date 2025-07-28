@@ -21,13 +21,17 @@ class IncomingMessage:
         self.task_id = task_id
         self.body = body
 
-
-class TaskInterface:
+class AyncTaskInterface:
     async def execute(self, _incoming_message: IncomingMessage, progress: Callable[[float], Awaitable]) -> Any:
         pass
 
+class SyncTaskInterface:
+    def execute(self, _incoming_message: IncomingMessage, progress: Callable[[float], None]) -> Any:
+        pass
 
-# --------------------------------------
+type TaskInterface = AyncTaskInterface | SyncTaskInterface
+
+#--------------------------------------
 # Typed exceptions
 # --------------------------------------
 class SendException(Exception):
@@ -142,20 +146,8 @@ class AsyncWorkerRunner:
             task_id = incoming_message.task_id
 
             await self.send_start_message(task_id)
-            result = None
-            try:
-                task = self.task_provider()
-
-                async def progress_callback(progress: float):
-                    try:
-                        await self.send_progress_message(task_id=task_id, progress=progress)
-                    except SendException:
-                        logger.info("Impossible d'envoyer le progress... {e}")
-
-                result = await task.execute(incoming_message, progress_callback)
-            except Exception as e:
-                raise TaskException(e)
-
+            result = await self.launch_task(task_id=task_id,incoming_message=incoming_message)
+            
             await self.send_sucess_message(task_id, result)
             await message.ack()
         except IncomingMessageException as e:
@@ -178,6 +170,31 @@ class AsyncWorkerRunner:
                 logger.info("Unable to send message...")
         if self.one_shot:
             self.stop()
+    
+    async def launch_task(self, task_id: str, incoming_message: IncomingMessage) -> Any:
+        result = None
+        try:
+                # Progress callback function async
+                async def progress_callback(progress: float):
+                    try:
+                        await self.send_progress_message(task_id=task_id, progress=progress)
+                    except SendException as e :
+                        logger.info("Impossible d'envoyer le progress... {e}")
+                # Progress callback function sync
+                def progress_callback_sync(progress: float):
+                    try:
+                        asyncio.run(self.send_progress_message(task_id=task_id, progress=progress))
+                    except SendException as e :
+                        logger.info("Impossible d'envoyer le progress... {e}")
+
+                task = self.task_provider()
+                if isinstance(task,AyncTaskInterface):
+                    result = await task.execute(incoming_message, progress_callback)
+                else:
+                    result = await asyncio.to_thread(lambda: task.execute(incoming_message, progress_callback_sync))
+                return result
+        except Exception as e:
+            raise TaskException(e)
 
     async def send_start_message(self, task_id: str) -> None:
         try:
