@@ -31,6 +31,17 @@ class SyncTaskInterface:
 
 type TaskInterface = AsyncTaskInterface | SyncTaskInterface
 
+class OnShot:
+    pass
+
+
+class Infinite:
+    def __init__(self, concurrency: int = 1):
+        self.concurrency = concurrency
+
+
+type WorkerMode = OnShot | Infinite
+
 #--------------------------------------
 # Typed exceptions
 # --------------------------------------
@@ -44,18 +55,6 @@ class IncomingMessageException(Exception):
 
 class TaskException(Exception):
     pass
-
-
-class OnShot:
-    pass
-
-
-class Infinite:
-    def __init__(self, concurrency: int = 1):
-        self.concurrency = concurrency
-
-
-type WorkerMode = OnShot | Infinite
 
 # --------------------------------------
 # HealthCheck Server
@@ -223,22 +222,22 @@ class AsyncWorkerRunner:
         result = None
         try:
                 # Progress callback function async
-                async def progress_callback(progress: float):
+                async def progress_callback_async(progress: float):
                     try:
                         await self.send_progress_message(task_id=task_id, progress=progress)
                     except SendException as e :
-                        logger.info("Impossible d'envoyer le progress... {e}")
+                        logger.info("Unable to send  progress... {e}")
                 # Progress callback function sync
                 def progress_callback_sync(progress: float):
                     try:
                         asyncio.run(self.send_progress_message(task_id=task_id, progress=progress))
                     except SendException as e :
-                        logger.info("Impossible d'envoyer le progress... {e}")
+                        logger.info("Unable to send progress... {e}")
 
                 task = self.task_provider()
                 if isinstance(task,AsyncTaskInterface):
                     logger.info(f"Running async task...")
-                    result = await task.execute(incoming_message, progress_callback)
+                    result = await task.execute(incoming_message, progress_callback_async)
                 else:
                     logger.info(f"Running sync task...")
                     result = await asyncio.to_thread(lambda: task.execute(incoming_message, progress_callback_sync))
