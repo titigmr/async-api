@@ -35,9 +35,8 @@ target_metadata = Base.metadata
 # ... etc.
 
 settings = Settings()
-database_url: str = settings.database_url_from_components
+database_url: str = settings.database_url_from_components.render_as_string(hide_password=False)
 config.set_main_option(name="sqlalchemy.url", value=database_url)
-logger.info(database_url)
 
 
 def run_migrations_offline() -> None:

@@ -21,12 +21,14 @@ database:
   # -- Database scheme for URL construction
   scheme: "postgresql+asyncpg"
 
-  # -- Use existing secret for database password
-  passwordFromSecret: {}
-    # -- Name of existing secret containing database password
+  url: ""
+
+  # -- Use existing secret for database url
+  urlFromSecret: {}
+    # -- Name of existing secret containing database url
     # name: ""
-    # -- Key in the secret containing the database password
-    # key: "password"
+    # -- Key in the secret containing the database url
+    # key: "url"
 
 # Message broker connection configuration with intelligent fallback strategy
 # @section -- Broker

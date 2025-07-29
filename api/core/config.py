@@ -1,5 +1,6 @@
+import sqlalchemy
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy.engine import URL
+from sqlalchemy.engine import URL, make_url
 
 
 class Settings(BaseSettings):
@@ -10,22 +11,22 @@ class Settings(BaseSettings):
     )
     PROJECT_NAME: str = "Task API"
 
-    DB_HOST: str = "db"
-    DB_PORT: int = 5432
-    DB_NAME: str = "tasks"
-    DB_USERNAME: str = "postgres"
-    DB_PASSWORD: str = "postgres"
+    DB_HOST: str | None = None
+    DB_PORT: int | None = None
+    DB_NAME: str | None = None
+    DB_USERNAME: str | None = None
+    DB_PASSWORD: str | None = None
     DB_SCHEME: str = "postgresql+asyncpg"
 
-    BROKER_HOST: str = "rabbitmq"
-    BROKER_PORT: int = 5672
-    BROKER_USERNAME: str = "guest"
-    BROKER_PASSWORD: str = "guest"
+    BROKER_HOST: str | None = None
+    BROKER_PORT: int | None = None
+    BROKER_USERNAME: str | None = None
+    BROKER_PASSWORD: str | None = None
     BROKER_VHOST: str = "/"
-    BROKER_SCHEME: str = "amqp"
+    BROKER_SCHEME: str | None = None
 
-    DATABASE_URL: str = "postgresql://postgres:postgres@db:5432/tasks"
-    BROKER_URL: str = "amqp://guest:guest@rabbitmq//"
+    DATABASE_URL: str | None = None
+    BROKER_URL: str | None = None
 
     PROJECT_DESCRIPTION: str = "API for managing tasks"
     SERVICES_CONFIG_FILE: str = "./config/services.yaml"
@@ -37,9 +38,11 @@ class Settings(BaseSettings):
     LISTENER_NOTIFIER_RETRY: int = 3  # 0, 1:1s, 2:4s, 3:9s, ...
 
     @property
-    def database_url_from_components(self) -> str:
+    def database_url_from_components(self) -> sqlalchemy.URL:
         """Construct database URL from individual components using sqlalchemy.URL"""
-        url_obj = URL.create(
+        if self.DATABASE_URL:
+            return make_url(self.DATABASE_URL)
+        return URL.create(
             drivername=self.DB_SCHEME,
             username=self.DB_USERNAME,
             password=self.DB_PASSWORD,
@@ -47,7 +50,6 @@ class Settings(BaseSettings):
             port=self.DB_PORT,
             database=self.DB_NAME,
         )
-        return str(url_obj)
 
     @property
     def broker_url_from_components(self) -> str:
