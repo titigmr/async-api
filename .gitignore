@@ -8,3 +8,5 @@ nodemodules/
 junit.xml
 .vscode
 .ruff_cache
+node_modules/
+package-lock.json
