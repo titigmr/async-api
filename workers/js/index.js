@@ -70,11 +70,21 @@ class MessageSender {
             }
         }) 
     }
+
+    async sendProgressMessage(task_id, progress) {
+        await this._sendMessage({
+            task_id: task_id,
+            data: {
+                message_type: "progress",
+                progress: progress
+            }
+        }) 
+    }
 }
 
 // Consumer et exécution des tâches
 class TaskManager {
-    constructor(rabbitmqUrl, rabbitmqUser, rabbitmqPassword,inQueue, outQueue, parallelism, taskFactory) {
+    constructor(rabbitmqUrl, rabbitmqUser, rabbitmqPassword,inQueue, outQueue, parallelism, taskFactory,oneShot) {
         this.rabbitmqUrl = rabbitmqUrl;
         this.rabbitmqUser = rabbitmqUser;
         this.rabbitmqPassword = rabbitmqPassword;
@@ -87,6 +97,7 @@ class TaskManager {
         this.inFlightMessages = new Map(); // Map(channel -> msg)
         this.isShuttingDown = false;
         this.messageSender = new MessageSender(rabbitmqUrl, rabbitmqUser, rabbitmqPassword, outQueue);
+        this.oneShot = oneShot;
     }
 
     async start() {
@@ -141,7 +152,7 @@ class TaskManager {
                 try {
                     await this.messageSender.sendStartMessage(submissionMessage.task_id);
                     let task = this.taskFactory();
-                    let result = await task.run(submissionMessage.data.body);
+                    let result = await task.run(submissionMessage.task_id,submissionMessage.data.body,(p) => this.messageSender.sendProgressMessage(submissionMessage.task_id,p));
                     await this.messageSender.sendSuccessMessage(submissionMessage.task_id,result);
                 } catch (err) {
                     await this.messageSender.sendFailureMessage(submissionMessage.task_id,err);
@@ -155,6 +166,10 @@ class TaskManager {
             // Dans tous les cas on ACK!
             channel.ack(msg);
             this.inFlightMessages.delete(channel);
+        }
+        if (this.oneShot) {
+            // Sigterm par défaut
+            process.kill(process.pid)
         }
     }
 
@@ -235,10 +250,12 @@ function sleepMs(ms) {
 //------------------------
 class MyTask {
     constructor(){}
-    async run({ sleep, mustSucceed }) {
+    async run(task_id,{ sleep, mustSucceed }, progressCallback) {
+        console.log("MyTask: "+task_id)
         if (mustSucceed) {
             for (var i = 0; i < sleep; i++) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
+                await progressCallback(100*i/sleep);
             }
             return { hello: "world" }
         } else {
@@ -257,7 +274,8 @@ let taskManager = new TaskManager(
     IN_QUEUE_NAME,
     OUT_QUEUE_NAME,
     LISTENER_COUNT,
-    () => new MyTask()
+    () => new MyTask(),
+    false
 );
 
 taskManager.start().catch((err) => {

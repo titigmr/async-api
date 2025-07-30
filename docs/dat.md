@@ -255,9 +255,8 @@ Cette entité définit les droits d'un client. Elle est liée à un client et à
 #### Requête
 
 ```json
-POST /api/services/<service-name>/tasks/
-CLIENT_ID=<client-id>
-CLIENT_SECRET=<client-secret>
+POST /v1/services/<service-name>/tasks/
+Authorization: Basic base64(<client-id>:<client-secret>)
 
 {
     "body": <service-body>,
@@ -270,8 +269,8 @@ CLIENT_SECRET=<client-secret>
 
 | **Variable** | **Optionnel** | **Description** |
 |--------------|---------------|-----------------|
-|  CLIENT_ID  | NON             | Id du consommateur de service, celui-ci doit être explicitement autorisé à consommer le service cible. |
-| CLIENT_SECRET | NON | Secret associé au consommateur de service |
+|  client-id  | NON             | Id du consommateur de service, celui-ci doit être explicitement autorisé à consommer le service cible. |
+| client-secret | NON | Secret associé au consommateur de service |
 | service-name | NON | Nom du service cible |
 | service-body | NON | Json object, argument du service cible. Cet objet peut éventuellement être validé contre le json-schema du service cible s'il est fournit. |
 | callback | OUI | Peut être vide, dans ce cas, aucune notification ne sera envoyée en fin de tâche. Ce cas suppose une vérification en mode polling du consommateur s'il a besoin de suivre l'état de la tâche. |
@@ -330,9 +329,8 @@ _Valorisation selon les cas d'erreur:_
 #### Requête
 
 ```json
-GET /api/services/<service-name>/tasks/<task-id>
-CLIENT_ID=<client-id>
-CLIENT_SECRET=<client-secret>
+GET /v1/services/<service-name>/tasks/<task-id>
+Authorization: Basic base64(<client-id>:<client-secret>)
 ```
 
 #### Réponse
@@ -442,8 +440,9 @@ _Valorisation selon les cas d'erreur:_
 | 404             | 404 001          | Service not found.                                               | Cas de l'invocation d'un service inexistant                                                                  |
 | 404             | 404 002          | Task not found.                                               | Tâche inexistante.                                                                  |
 | 403             | 403 001          | Forbidden.                                                       | Cas de droits nécessaires insiffisants pour appeler le service (ou couple CLIENT-ID/CLIENT-SECRET incorrect) |
-                                                        |
 
+
+                                                     
 ## Callback exposé par les consommateurs
 
 Le callback est optionnel - mais son absence impose un polling du consommateur. 
@@ -569,13 +568,6 @@ Message envoyé par le système
 ### Code
 
 ```javascript
-/* exemple de message: 
-{
-  "taskId": "089373b8-1691-4462-8f78-25e3af1a1c6b",
-  "data": { "messageType": "submission", "body": { "sleep": 10, "mustSucceed": true} }
-}
-*/
-
 const amqp = require('amqplib');
 const os = require('os');
 
@@ -587,8 +579,8 @@ const RABBITMQ_USER = process.env.RABBITMQ_USER || 'kalo';
 const RABBITMQ_PASSWORD = process.env.RABBITMQ_PASSWORD || 'kalo';
 const LISTENER_COUNT = Number(process.env.LISTENER_COUNT) || 5;
 
-const IN_QUEUE_NAME = process.env.IN_QUEUE_NAME || 'my_queue_in';
-const OUT_QUEUE_NAME = process.env.OUT_QUEUE_NAME ||'my_queue_out';
+const IN_QUEUE_NAME = process.env.IN_QUEUE_NAME || 'example';
+const OUT_QUEUE_NAME = process.env.OUT_QUEUE_NAME ||'example_out';
 
 //------------------------
 // FRAMEWORK
@@ -619,40 +611,50 @@ class MessageSender {
         await connection.close();
     }
 
-    async sendStartMessage(taskId) {
+    async sendStartMessage(task_id) {
         await this._sendMessage({
-            taskId: taskId,
+            task_id: task_id,
             data: {
-                messageType: "started",
-                hostName: os.hostname()
+                message_type: "started",
+                hostname: os.hostname()
             }
-        }) 
+        })
     }
 
-    async sendSuccessMessage(taskId, result) {
+    async sendSuccessMessage(task_id, result) {
         await this._sendMessage({
-            taskId: taskId,
+            task_id: task_id,
             data: {
-                messageType: "success",
+                message_type: "success",
                 response: result
             }
         }) 
     }
 
-    async sendFailureMessage(taskId, cause) {
+    async sendFailureMessage(task_id, cause) {
         await this._sendMessage({
-            taskId: taskId,
+            task_id: task_id,
             data: {
-                messageType: "failure",
-                errorMessage: cause
+                message_type: "failure",
+                error_message: cause
+            }
+        }) 
+    }
+
+    async sendProgressMessage(task_id, progress) {
+        await this._sendMessage({
+            task_id: task_id,
+            data: {
+                message_type: "progress",
+                progress: progress
             }
         }) 
     }
 }
 
-// Consumer est exécution des tâches
+// Consumer et exécution des tâches
 class TaskManager {
-    constructor(rabbitmqUrl, rabbitmqUser, rabbitmqPassword,inQueue, outQueue, parallelism, taskFactory) {
+    constructor(rabbitmqUrl, rabbitmqUser, rabbitmqPassword,inQueue, outQueue, parallelism, taskFactory,oneShot) {
         this.rabbitmqUrl = rabbitmqUrl;
         this.rabbitmqUser = rabbitmqUser;
         this.rabbitmqPassword = rabbitmqPassword;
@@ -665,12 +667,21 @@ class TaskManager {
         this.inFlightMessages = new Map(); // Map(channel -> msg)
         this.isShuttingDown = false;
         this.messageSender = new MessageSender(rabbitmqUrl, rabbitmqUser, rabbitmqPassword, outQueue);
+        this.oneShot = oneShot;
     }
 
     async start() {
-        const opt = { credentials: amqp.credentials.plain(this.rabbitmqUser, this.rabbitmqPassword) };
-        const connection = await amqp.connect(this.rabbitmqUrl,opt);
-
+        let connection = null;
+        while (true) {
+            const opt = { credentials: amqp.credentials.plain(this.rabbitmqUser, this.rabbitmqPassword) };
+            try {
+                connection = await amqp.connect(this.rabbitmqUrl,opt);
+                break;
+            } catch (error) {
+                console.log("Connection error, retry in 2s.")
+                await sleepMs(2000)
+            }
+        }
         // Gestion SIGTERM
         process.on('SIGTERM', async () => {
             await this.shutdown(connection);
@@ -703,18 +714,18 @@ class TaskManager {
 
         const content = msg.content.toString();
         console.log(`[Listener ${channelIndex}] Reçu : ${content}`);
-        const submissionMessage = this.parseSubmissionMessage(content); 
+        const submissionMessage = this.parseSubmissionMessage(content);
 
         try {
             if (submissionMessage) {
-                console.log("[Listener ${channelIndex}] Submission : ",submissionMessage);
+                console.log(`[Listener ${channelIndex}] Submission : `,submissionMessage);
                 try {
-                    await this.messageSender.sendStartMessage(submissionMessage.taskId);
+                    await this.messageSender.sendStartMessage(submissionMessage.task_id);
                     let task = this.taskFactory();
-                    let result = await task.run(submissionMessage.data.body);
-                    await this.messageSender.sendSuccessMessage(submissionMessage.taskId,result);
+                    let result = await task.run(submissionMessage.task_id,submissionMessage.data.body,(p) => this.messageSender.sendProgressMessage(submissionMessage.task_id,p));
+                    await this.messageSender.sendSuccessMessage(submissionMessage.task_id,result);
                 } catch (err) {
-                    await this.messageSender.sendFailureMessage(submissionMessage.taskId,err);
+                    await this.messageSender.sendFailureMessage(submissionMessage.task_id,err);
                 }
             } else {
                 console.error(`[Listener ${channelIndex}] Message invalide : ${content}`);
@@ -726,12 +737,16 @@ class TaskManager {
             channel.ack(msg);
             this.inFlightMessages.delete(channel);
         }
+        if (this.oneShot) {
+            // Sigterm par défaut
+            process.kill(process.pid)
+        }
     }
 
     parseSubmissionMessage(content) {
         try {
             let json = JSON.parse(content); 
-            if (json.taskId && json.data && json.data.messageType && json.data.body) {
+            if (json.task_id && json.data && json.data.message_type && json.data.body) {
                 return json;
             } else {
                 return null;
@@ -750,7 +765,7 @@ class TaskManager {
         this.isShuttingDown=true;
 
         // Arret des channels sans message en cours.
-        // On ne veut pas qu'un channel en attente 
+        // On ne veut pas qu'un channel en attente
         // puisse capter un message lors de l'arret
         // d'un autre listener (requeue)
         for (const channelIndex in this.channels) {
@@ -805,10 +820,12 @@ function sleepMs(ms) {
 //------------------------
 class MyTask {
     constructor(){}
-    async run({ sleep, mustSucceed }) {
+    async run(task_id,{ sleep, mustSucceed }, progressCallback) {
+        console.log("MyTask: "+task_id)
         if (mustSucceed) {
             for (var i = 0; i < sleep; i++) {
                 await new Promise(resolve => setTimeout(resolve, 1000));
+                await progressCallback(100*i/sleep);
             }
             return { hello: "world" }
         } else {
@@ -821,20 +838,20 @@ class MyTask {
 // EXECUTION
 //------------------------
 let taskManager = new TaskManager(
-    RABBITMQ_URL, 
+    RABBITMQ_URL,
     RABBITMQ_USER,
     RABBITMQ_PASSWORD,
     IN_QUEUE_NAME,
     OUT_QUEUE_NAME,
     LISTENER_COUNT,
-    () => new MyTask()
+    () => new MyTask(),
+    false
 );
 
 taskManager.start().catch((err) => {
     console.error('[!] Erreur de démarrage', err);
     process.exit(1);
 });
-
 ```
 
 ### Package.json
