@@ -34,18 +34,6 @@ Create chart name and version as used by the chart label.
 
 
 {{/*
-Create image pull secret
-*/}}
-{{- define "helper.imagePullSecret" }}
-{{- $registry := .registry -}}
-{{- $username := .username -}}
-{{- $password := .password -}}
-{{- $email := .email -}}
-{{- printf "{\"auths\":{\"%s\":{\"username\":\"%s\",\"password\":\"%s\",\"email\":\"%s\",\"auth\":\"%s\"}}}" $registry $username $password $email (printf "%s:%s" $username $password | b64enc) | b64enc }}
-{{- end }}
-
-
-{{/*
 Create container environment variables from configmap
 */}}
 {{- define "helper.env" -}}
@@ -140,76 +128,85 @@ Parameters:
 {{ include "helper.selectorLabels" (dict "root" $root "componentName" $componentName) }}
 {{- end -}}
 
+
 {{/*
-==========================================================================
-DATABASE CONFIGURATION HELPERS
-==========================================================================
-Individual component helpers with intelligent fallback strategy
-Priority: individual components > subchart defaults > error
+Get database environment configuration type based on priority
+Returns: "urlFromSecret", "url", "components", "postgresql"
 */}}
-{{- define "chart.databaseHost" -}}
-{{- if and .Values.database .Values.database.host -}}
-{{- .Values.database.host -}}
+{{- define "chart.databaseEnvType" -}}
+{{- if .Values.database.urlFromSecret.name -}}
+urlFromSecret
+{{- else if .Values.database.url -}}
+url
+{{- else if or .Values.database.components.host .Values.database.components.name .Values.database.components.username .Values.database.components.password -}}
+components
 {{- else if .Values.postgresql.enabled -}}
+postgresql
+{{- else -}}
+{{- fail "Database configuration required: either set database.urlFromSecret, database.url, database.components, or enable postgresql subchart" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Get database secret name based on configuration type
+*/}}
+{{- define "chart.databaseSecretName" -}}
+{{- $envType := include "chart.databaseEnvType" . -}}
+{{- if eq $envType "urlFromSecret" -}}
+{{- .Values.database.urlFromSecret.name -}}
+{{- else if eq $envType "postgresql" -}}
+{{- if .Values.postgresql.auth.password -}}
+{{- printf "%s-database" (include "helper.fullname" .) -}}
+{{- else -}}
 {{- include "chart.postgresql.fullname" . -}}
+{{- end -}}
 {{- else -}}
-{{- fail "Database host required: either set database.host or enable postgresql subchart" -}}
+{{- printf "%s-database" (include "helper.fullname" .) -}}
 {{- end -}}
 {{- end -}}
 
-{{- define "chart.databasePort" -}}
-{{- if and .Values.database .Values.database.port -}}
-{{- .Values.database.port -}}
-{{- else if .Values.postgresql.enabled -}}
-{{- .Values.postgresql.primary.service.ports.postgresql | default 5432 -}}
+{{/*
+Get broker environment configuration type based on priority
+Returns: "urlFromSecret", "url", "components", "rabbitmq"
+*/}}
+{{- define "chart.brokerEnvType" -}}
+{{- if .Values.broker.urlFromSecret.name -}}
+urlFromSecret
+{{- else if .Values.broker.url -}}
+url
+{{- else if or .Values.broker.components.host .Values.broker.components.username .Values.broker.components.password -}}
+components
+{{- else if .Values.rabbitmq.enabled -}}
+rabbitmq
 {{- else -}}
-{{- 5432 -}}
+{{- fail "Broker configuration required: either set broker.urlFromSecret, broker.url, broker.components, or enable rabbitmq subchart" -}}
 {{- end -}}
-{{- end -}}
-
-{{- define "chart.databaseName" -}}
-{{- if and .Values.database .Values.database.name -}}
-{{- .Values.database.name -}}
-{{- else if .Values.postgresql.enabled -}}
-{{- .Values.postgresql.auth.database | default "postgres" -}}
-{{- else -}}
-{{- fail "Database name required: either set database.name or enable postgresql subchart" -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "chart.databaseUsername" -}}
-{{- if and .Values.database .Values.database.username -}}
-{{- .Values.database.username -}}
-{{- else if .Values.postgresql.enabled -}}
-{{- .Values.postgresql.auth.username | default "postgres" -}}
-{{- else -}}
-{{- fail "Database username required: either set database.username or enable postgresql subchart" -}}
-{{- end -}}
-{{- end -}}
-
-{{- define "chart.databaseScheme" -}}
-{{- .Values.database.scheme | default "postgresql+asyncpg" -}}
 {{- end -}}
 
 {{/*
 ==========================================================================
-BROKER CONFIGURATION HELPERS
+BACKWARD COMPATIBILITY HELPERS
 ==========================================================================
-Individual component helpers with intelligent fallback strategy
+These helpers are kept for backward compatibility with existing templates
 */}}
+
+{{/*
+Helper to get the broker configuration
+*/}}
+
 {{- define "chart.brokerHost" -}}
-{{- if and .Values.broker .Values.broker.host -}}
-{{- .Values.broker.host -}}
+{{- if .Values.broker.components.host -}}
+{{- .Values.broker.components.host -}}
 {{- else if .Values.rabbitmq.enabled -}}
 {{- include "chart.rabbitmq.fullname" . -}}
 {{- else -}}
-{{- fail "Broker host required: either set broker.host or enable rabbitmq subchart" -}}
+{{- fail "Broker host required" -}}
 {{- end -}}
 {{- end -}}
 
 {{- define "chart.brokerPort" -}}
-{{- if and .Values.broker .Values.broker.port -}}
-{{- .Values.broker.port -}}
+{{- if .Values.broker.components.port -}}
+{{- .Values.broker.components.port -}}
 {{- else if .Values.rabbitmq.enabled -}}
 {{- .Values.rabbitmq.service.ports.amqp | default 5672 -}}
 {{- else -}}
@@ -218,81 +215,28 @@ Individual component helpers with intelligent fallback strategy
 {{- end -}}
 
 {{- define "chart.brokerUsername" -}}
-{{- if and .Values.broker .Values.broker.username -}}
-{{- .Values.broker.username -}}
+{{- if .Values.broker.components.username -}}
+{{- .Values.broker.components.username -}}
 {{- else if .Values.rabbitmq.enabled -}}
 {{- .Values.rabbitmq.auth.username | default "user" -}}
 {{- else -}}
-{{- fail "Broker username required: either set broker.username or enable rabbitmq subchart" -}}
+{{- fail "Broker username required" -}}
 {{- end -}}
 {{- end -}}
 
 {{- define "chart.brokerVhost" -}}
-{{- if and .Values.broker .Values.broker.vhost -}}
-{{- .Values.broker.vhost -}}
+{{- if .Values.broker.components.vhost -}}
+{{- .Values.broker.components.vhost -}}
 {{- else -}}
 {{- "/" -}}
 {{- end -}}
 {{- end -}}
 
 {{- define "chart.brokerScheme" -}}
-{{- .Values.broker.scheme | default "amqp" -}}
+{{- .Values.broker.components.scheme | default "amqp" -}}
 {{- end -}}
 
-{{/*
-==========================================================================
-PASSWORD AND SECRET MANAGEMENT HELPERS
-==========================================================================
-Intelligent secret name and key resolution with fallback strategy
-*/}}
-{{/*
-Get database password secret name (existing secret or generated one)
-*/}}
-{{- define "chart.databasePasswordSecretName" -}}
-{{- .Values.database.passwordFromSecret.name | default (printf "%s-passwords" (include "helper.fullname" .)) -}}
-{{- end -}}
 
-{{/*
-Get database password secret key
-*/}}
-{{- define "chart.databasePasswordSecretKey" -}}
-{{- .Values.database.passwordFromSecret.key | default "db-password" -}}
-{{- end -}}
-
-{{/*
-Get broker password secret name (existing secret or generated one)
-*/}}
-{{- define "chart.brokerPasswordSecretName" -}}
-{{- .Values.broker.passwordFromSecret.name | default (printf "%s-passwords" (include "helper.fullname" .)) -}}
-{{- end -}}
-
-{{/*
-Get broker password secret key
-*/}}
-{{- define "chart.brokerPasswordSecretKey" -}}
-{{- .Values.broker.passwordFromSecret.key | default "broker-password" -}}
-{{- end -}}
-
-{{/*
-Get database password value (direct or from subchart)
-*/}}
-{{- define "chart.databasePassword" -}}
-{{- .Values.database.password | default .Values.postgresql.auth.password | default "asynctask123" -}}
-{{- end -}}
-
-{{/*
-Get broker password value (direct or from subchart)
-*/}}
-{{- define "chart.brokerPassword" -}}
-{{- .Values.broker.password | default .Values.rabbitmq.auth.password | default "kalo" -}}
-{{- end -}}
-
-{{/*
-==========================================================================
-SUBCHART SERVICE NAME CONSTRUCTION
-==========================================================================
-Service name construction helpers that mimic subchart naming logic
-*/}}
 {{/*
 PostgreSQL service name construction (mimics subchart logic)
 */}}
@@ -325,12 +269,7 @@ RabbitMQ service name construction
 {{- end -}}
 {{- end -}}
 
-{{/*
-==========================================================================
-KEDA AUTOSCALING HELPERS
-==========================================================================
-KEDA-specific helpers for autoscaling configuration
-*/}}
+
 {{/*
 Get RabbitMQ address for KEDA (host:port format)
 */}}
@@ -349,5 +288,11 @@ Get RabbitMQ username for KEDA
 Get RabbitMQ password for KEDA
 */}}
 {{- define "chart.kedaRabbitmqPassword" -}}
-{{- include "chart.brokerPassword" . -}}
+{{- if .Values.broker.components.password -}}
+{{- .Values.broker.components.password -}}
+{{- else if .Values.rabbitmq.enabled -}}
+{{- .Values.rabbitmq.auth.password | default "kalo" -}}
+{{- else -}}
+{{- fail "Broker password required for KEDA" -}}
+{{- end -}}
 {{- end -}}

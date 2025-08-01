@@ -1,20 +1,22 @@
-
 import asyncio
 
 
 class HealthCheckServer:
+    def __init__(self, host: str, port: int) -> None:
+        self.host: str = host
+        self.port: int = port
 
-    def __init__(self, host: str, port: int):
-        self.host = host
-        self.port = port
-
-    async def start(self):
-        server = await asyncio.start_server(self.handler_health_check, self.host, self.port)
+    async def start(self) -> None:
+        server = await asyncio.start_server(
+            client_connected_cb=self.handler_health_check,
+            host=self.host,
+            port=self.port,
+        )
         await server.start_serving()
 
-    async def handler_health_check(self,reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    async def handler_health_check(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
-            await reader.readuntil(b'\r\n\r\n')
+            await reader.readuntil(b"\r\n\r\n")
         except asyncio.IncompleteReadError:
             writer.close()
             await writer.wait_closed()
@@ -29,7 +31,6 @@ class HealthCheckServer:
             "\r\n"
             f"{body}"
         )
-
         writer.write(response.encode())
         await writer.drain()
         writer.close()

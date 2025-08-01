@@ -44,11 +44,19 @@ spec:
     - type: rabbitmq
       metricType: AverageValue
       metadata:
-        address: {{ include "chart.kedaRabbitmqAddress" $ | quote }}
-        listName: {{ .kedaAutoscaler.rabbitmq.listName | quote }}
-        listLength: {{ .kedaAutoscaler.rabbitmq.listLength | quote }}
+        {{- $brokerEnvType := include "chart.brokerEnvType" $ -}}
+        {{- if or (eq $brokerEnvType "urlFromSecret") (eq $brokerEnvType "url") }}
+        # Using connection string from TriggerAuthentication
+        queueName: {{ .kedaAutoscaler.rabbitmq.queueName | default .kedaAutoscaler.rabbitmq.listName | quote }}
+        queueLength: {{ .kedaAutoscaler.rabbitmq.queueLength | default .kedaAutoscaler.rabbitmq.listLength | default "10" | quote }}
+        {{- else }}
+        # Using individual components from TriggerAuthentication
+        queueName: {{ .kedaAutoscaler.rabbitmq.queueName | default .kedaAutoscaler.rabbitmq.listName | quote }}
+        queueLength: {{ .kedaAutoscaler.rabbitmq.queueLength | default .kedaAutoscaler.rabbitmq.listLength | default "10" | quote }}
+        vhostName: {{ $.Values.broker.components.vhost | default $.Values.rabbitmq.auth.vhost | default "/" | quote }}
+        {{- end }}
       authenticationRef:
-        name: {{ printf "%s-worker-%s-rabbitmq-auth" (include "helper.fullname" $) .name }}
+        name: {{ printf "%s-worker-%s-trigger-auth" (include "helper.fullname" $) .name }}
 {{- end }}
 {{- end }}
 {{- end }}

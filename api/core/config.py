@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     BROKER_USERNAME: str | None = None
     BROKER_PASSWORD: str | None = None
     BROKER_VHOST: str = "/"
-    BROKER_SCHEME: str | None = None
+    BROKER_SCHEME: str | None = "amqp"
 
     DATABASE_URL: str | None = None
     BROKER_URL: str | None = None
@@ -36,12 +36,14 @@ class Settings(BaseSettings):
     LISTENER_LOG_LEVEL: str = "INFO"
     LISTENER_CONCURRENCY: int = 20
     LISTENER_NOTIFIER_RETRY: int = 3  # 0, 1:1s, 2:4s, 3:9s, ...
+    LISTENER_HEALTH_CHECK_HOST: str = "0.0.0.0"  # noqa: S104
+    LISTENER_HEALTH_CHECK_PORT: int = 8081
 
     @property
     def database_url_from_components(self) -> sqlalchemy.URL:
         """Construct database URL from individual components using sqlalchemy.URL"""
         if self.DATABASE_URL:
-            return make_url(self.DATABASE_URL)
+            return make_url(name_or_url=self.DATABASE_URL)
         return URL.create(
             drivername=self.DB_SCHEME,
             username=self.DB_USERNAME,
@@ -61,6 +63,22 @@ class Settings(BaseSettings):
         else:
             vhost = f"/{self.BROKER_VHOST}"
         return f"{self.BROKER_SCHEME}://{self.BROKER_USERNAME}:{self.BROKER_PASSWORD}@{self.BROKER_HOST}:{self.BROKER_PORT}{vhost}"
+
+    @property
+    def broker_connection_kwargs(self) -> dict[str, str | int | None]:
+        """Return broker connection parameters as kwargs for aio_pika.connect_robust()"""
+        # If BROKER_URL is set, use it directly
+        if self.BROKER_URL:
+            return {"url": self.BROKER_URL}
+
+        # Return direct dict with all components
+        return {
+            "host": self.BROKER_HOST,
+            "port": self.BROKER_PORT,
+            "login": self.BROKER_USERNAME,
+            "password": self.BROKER_PASSWORD,
+            "virtualhost": self.BROKER_VHOST,
+        }
 
 
 settings = Settings()

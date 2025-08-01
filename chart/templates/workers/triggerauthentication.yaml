@@ -1,25 +1,68 @@
 {{ if .Capabilities.APIVersions.Has "keda.sh/v1alpha1" -}}
 {{- range .Values.workers }}
-{{- if and .enabled (and .kedaAutoscaler .kedaAutoscaler.enabled) }}
+{{- if and .enabled .kedaAutoscaler .kedaAutoscaler.enabled }}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
 metadata:
-  name: {{ printf "%s-worker-%s-rabbitmq-auth" (include "helper.fullname" $) .name }}
+  name: {{ printf "%s-worker-%s-trigger-auth" (include "helper.fullname" $) .name }}
   namespace: {{ $.Release.Namespace }}
-  labels:
-    {{- include "helper.labels" (dict "root" $ "componentName" "worker") | nindent 4 }}
-    worker.name: {{ .name }}
-    async-api.io/resource-type: trigger-authentication
 spec:
-  configMapTargetRef:
-  - parameter: username
-    name: {{ include "helper.fullname" $ }}-env-config
-    key: BROKER_USERNAME
   secretTargetRef:
+  {{- $brokerEnvType := include "chart.brokerEnvType" $ -}}
+  {{- if eq $brokerEnvType "urlFromSecret" }}
+  # User-provided broker URL from external secret
+  - parameter: connection
+    name: {{ $.Values.broker.urlFromSecret.name }}
+    key: {{ $.Values.broker.urlFromSecret.key | default "BROKER_URL" }}
+  {{- else if eq $brokerEnvType "url" }}
+  # User-provided broker URL from values
+  - parameter: connection
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_URL
+  {{- else if eq $brokerEnvType "components" }}
+  # Components configuration - we need to build the URL from parts
+  - parameter: host
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_HOST
+  - parameter: port
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_PORT
+  - parameter: username
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_USERNAME
   - parameter: password
-    name: {{ include "chart.brokerPasswordSecretName" $ }}
-    key: {{ include "chart.brokerPasswordSecretKey" $ }}
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_PASSWORD
+  - parameter: vhost
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_VHOST
+  {{- else if eq $brokerEnvType "rabbitmq" }}
+  # RabbitMQ subchart configuration
+  - parameter: host
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_HOST
+  - parameter: port
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_PORT
+  - parameter: username
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_USERNAME
+  - parameter: vhost
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_VHOST
+  {{- if $.Values.rabbitmq.auth.password }}
+  # Use our broker secret with the configured password
+  - parameter: password
+    name: {{ printf "%s-broker" (include "helper.fullname" $) }}
+    key: BROKER_PASSWORD
+  {{- else }}
+  # Use RabbitMQ subchart auto-generated password
+  - parameter: password
+    name: {{ printf "%s-rabbitmq" $.Release.Name }}
+    key: rabbitmq-password
+  {{- end }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

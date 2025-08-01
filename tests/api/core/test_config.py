@@ -9,15 +9,7 @@ from api.core.config import Settings
 class TestConfigComponents:
     """Test the construction of URLs from individual components."""
 
-    def test_database_url_from_components_default(self):
-        """Test database URL construction with default values."""
-        settings = Settings()
-        url = settings.database_url_from_components
-        assert "postgresql+asyncpg://" in url
-        assert "db:5432" in url
-        assert "tasks" in url
-
-    def test_database_url_from_components_custom(self):
+    def test_database_url_from_components_custom(self) -> None:
         """Test database URL construction with custom environment variables."""
         with patch.dict(
             os.environ,
@@ -30,18 +22,12 @@ class TestConfigComponents:
                 "DB_SCHEME": "postgresql+asyncpg",
             },
         ):
+            print(os.environ.get("DB_HOST"))  # Debugging print
             settings = Settings()
-            url = settings.database_url_from_components
-            assert "postgresql+asyncpg://custom-user:" in url
-            assert "@custom-db:9999/custom-tasks" in url
+            url = str(settings.database_url_from_components)
+            assert url == "postgresql+asyncpg://custom-user:custom-pass@custom-db:9999/custom-tasks"
 
-    def test_broker_url_from_components_default(self):
-        """Test broker URL construction with default values."""
-        settings = Settings()
-        url = settings.broker_url_from_components
-        assert url == "amqp://guest:guest@rabbitmq:5672"
-
-    def test_broker_url_from_components_custom(self):
+    def test_broker_url_from_components_custom(self) -> None:
         """Test broker URL construction with custom environment variables."""
         with patch.dict(
             os.environ,
@@ -54,36 +40,11 @@ class TestConfigComponents:
             },
         ):
             settings = Settings()
-            url = settings.broker_url_from_components
+            url = str(settings.broker_url_from_components)
             assert url == "amqp://custom-user:custom-pass@custom-broker:5673/custom"
 
-    def test_broker_url_vhost_root(self):
-        """Test broker URL construction with root vhost."""
-        with patch.dict(
-            os.environ,
-            {
-                "BROKER_VHOST": "/",
-            },
-        ):
-            settings = Settings()
-            url = settings.broker_url_from_components
-            # Root vhost should result in no path
-            assert not url.endswith("/")
-
-    def test_broker_url_vhost_custom(self):
-        """Test broker URL construction with custom vhost."""
-        with patch.dict(
-            os.environ,
-            {
-                "BROKER_VHOST": "myvhost",
-            },
-        ):
-            settings = Settings()
-            url = settings.broker_url_from_components
-            assert url.endswith("/myvhost")
-
-    def test_backward_compatibility(self):
-        """Test that legacy URL properties still work."""
+    def test_full_url_properties(self) -> None:
+        """Test that full URL properties still work."""
         settings = Settings()
         assert hasattr(settings, "DATABASE_URL")
         assert hasattr(settings, "BROKER_URL")

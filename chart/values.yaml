@@ -5,53 +5,65 @@ nameOverride: ""
 # @section -- General
 fullnameOverride: ""
 
-# Database connection configuration
+# Database connection configuration with intelligent fallback strategy
 # @section -- Database
 database:
-  # -- Database host
-  host: ""
-  # -- Database port
-  port: 5432
-  # -- Database name
-  name: ""
-  # -- Database username
-  username: ""
-  # -- Database password (if not using passwordFromSecret)
-  password: ""
-  # -- Database scheme for URL construction
-  scheme: "postgresql+asyncpg"
-
+  # -- Database connection URL (creates secret with DATABASE_URL)
+  # Example: "postgresql+asyncpg://user:pass@host:5432/dbname"
   url: ""
 
-  # -- Use existing secret for database url
+  # -- Use existing secret for database url (highest priority - no secret creation)
   urlFromSecret: {}
     # -- Name of existing secret containing database url
-    # name: ""
-    # -- Key in the secret containing the database url
-    # key: "url"
+    # name: "my-database-secret"
+    # -- Key in the secret containing the database url  
+    # key: "DATABASE_URL"
+
+  # -- Database components (creates secret with DB_HOST, DB_PORT, etc.)
+  # @section -- Database
+  components:
+    # -- Database host
+    host: ""
+    # -- Database port
+    port: 5432
+    # -- Database name
+    name: ""
+    # -- Database username
+    username: ""
+    # -- Database password
+    password: ""
+    # -- Database scheme for URL construction
+    scheme: "postgresql+asyncpg"
 
 # Message broker connection configuration with intelligent fallback strategy
 # @section -- Broker
 broker:
-  # -- Broker host
-  host: ""
-  # -- Broker port
-  port: 5672
-  # -- Broker username
-  username: ""
-  # -- Broker password
-  password: ""
-  # -- Virtual host for broker URL construction
-  vhost: "/"
-  # -- Broker scheme for URL construction
-  scheme: "amqp"
+  # -- Broker connection URL (creates secret with BROKER_URL)
+  # Example: "amqp://user:pass@host:5672/vhost"
+  url: ""
 
-  # -- Use existing secret for broker password
-  passwordFromSecret: {}
-    # -- Name of existing secret containing broker password
-    # name: ""
-    # -- Key in the secret containing the broker password
-    # key: "password"
+  # -- Use existing secret for broker url (highest priority - no secret creation)
+  urlFromSecret: {}
+    # -- Name of existing secret containing broker url
+    # name: "my-broker-secret"
+    # -- Key in the secret containing the broker url
+    # key: "BROKER_URL"
+
+  # -- Broker components (creates secret with BROKER_HOST, BROKER_PORT, etc.)
+  # @section -- Broker
+  components:
+    # -- Broker host
+    host: ""
+    # -- Broker port
+    port: 5672
+    # -- Broker username
+    username: ""
+    # -- Broker password
+    password: ""
+    # -- Virtual host for broker URL construction
+    vhost: "/"
+    # -- Broker scheme for URL construction
+    scheme: "amqp"
 
 # Configuration files management
 # @section -- Config
@@ -171,24 +183,35 @@ api:
     args: []
     # @ Section -- Api.listener
     # Configure probe settings for the listener container.
-    probes: {}
-    # @ Section -- Api.listener
-    # Configure probes for the listener container (liveness, readiness, startup).
-    #  livenessProbe:
-    #    exec:
-    #      command:
-    #      - cat
-    #      - /tmp/healthy
-    #    initialDelaySeconds: 5
-    #    periodSeconds: 5
-    #  readinessProbe:
-    #    exec:
-    #      command:
-    #      - cat
-    #      - /tmp/healthy
-    #    initialDelaySeconds: 5
-    #    periodSeconds: 5
-    env: {}
+    probes:
+      startupProbe:
+        httpGet:
+          path: /health
+          port: 8081
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 30
+        successThreshold: 1
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8081
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8081
+        initialDelaySeconds: 15
+        periodSeconds: 20
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+    env:
     # @ section -- Api.listener
     # -- listener container env secrets, it will be injected into a secret and loaded into the container.
 
@@ -300,76 +323,32 @@ api:
   # @section -- Api
   secrets: {}
   probes:
-    healthcheck:
-      # -- Api container healthcheck endpoint for liveness probe.
-      # @section -- Api
-      path: "/internal/health"
-      # -- Port to use for healthcheck (defaults to container port if not set)
-      # @section -- Api
-      port: 8000
-    readiness:
-      # -- Api container readiness endpoint for startup and readiness probes.
-      # @section -- Api
-      path: "/internal/ready"
-      # -- Port to use for readiness check (defaults to container port if not set)
-      # @section -- Api
-      port: 8000
     startupProbe:
-      # -- Whether or not enable the probe.
-      # @section -- Api
-      enabled: true
-      # -- Number of seconds after the container has started before probe is initiated.
-      # @section -- Api
+      httpGet:
+        path: "/internal/readiness"
+        port: 8000
       initialDelaySeconds: 0
-      # -- Minimum consecutive successes for the probe to be considered successful after having failed.
-      # @section -- Api
       successThreshold: 1
-      # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
-      # @section -- Api
       failureThreshold: 30
-      # -- How often (in seconds) to perform the probe.
-      # @section -- Api
       periodSeconds: 10
-      # -- Number of seconds after which the probe times out.
-      # @section -- Api
       timeoutSeconds: 5
     readinessProbe:
-      # -- Whether or not enable the probe.
-      # @section -- Api
-      enabled: true
-      # -- Number of seconds after the container has started before probe is initiated.
-      # @section -- Api
+      httpGet:
+        path: "/internal/readiness"
+        port: 8000
       initialDelaySeconds: 5
-      # -- Minimum consecutive successes for the probe to be considered successful after having failed.
-      # @section -- Api
       successThreshold: 1
-      # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
-      # @section -- Api
       failureThreshold: 3
-      # -- How often (in seconds) to perform the probe.
-      # @section -- Api
       periodSeconds: 10
-      # -- Number of seconds after which the probe times out.
-      # @section -- Api
       timeoutSeconds: 5
     livenessProbe:
-      # -- Whether or not enable the probe.
-      # @section -- Api
-      enabled: true
-      # -- Number of seconds after the container has started before probe is initiated.
-      # @section -- Api
+      httpGet:
+        path: "/internal/health"
+        port: 8000
       initialDelaySeconds: 30
-      # -- Minimum consecutive successes for the probe to be considered successful after having failed.
-      # @section -- Api
       successThreshold: 1
-      # -- Minimum consecutive failures for the probe to be considered failed after having succeeded.
-      # @section -- Api
       failureThreshold: 3
-      # -- How often (in seconds) to perform the probe.
-      # @section -- Api
       periodSeconds: 30
-      # -- Number of seconds after which the probe times out.
-      # @section -- Api
       timeoutSeconds: 5
   strategy:
     # -- Strategy type used to replace old Pods by new ones, can be `Recreate` or `RollingUpdate`.
@@ -1553,6 +1532,10 @@ workers:
           value: "generic-worker"
         - name: LOG_LEVEL
           value: "INFO"
+        - name: WORKER_HEALTH_CHECK_HOST
+          value: "0.0.0.0"
+        - name: WORKER_HEALTH_CHECK_PORT
+          value: "8000"
 
       # -- Environment variables from secrets (database and broker URLs will be injected automatically)
       # @section -- Workers
@@ -1747,6 +1730,43 @@ workers:
     #         type: "generic"
     #         timeout: 3600
 
+    # -- Health check probes configuration
+    # @section -- Workers
+    probes:
+      # -- Startup probe configuration
+      # @section -- Workers
+      startupProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 30
+        successThreshold: 1
+      # -- Readiness probe configuration
+      # @section -- Workers
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+      # -- Liveness probe configuration
+      # @section -- Workers
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
+
   # -- Example job worker with event-driven scaling
   # @section -- Workers
   - # -- Worker name
@@ -1878,6 +1898,36 @@ workers:
         labels:
           job-type: "batch-processor"
         annotations: {}
+
+    # -- Health check configuration (enabled when metrics is disabled)
+    # @section -- Workers
+    healthCheck:
+      enabled: true
+      port: 8000
+      startupProbe:
+        httpGet:
+          path: /health
+          port: health
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: health
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        timeoutSeconds: 3
+        failureThreshold: 2
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: health
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
 
     # -- Additional volumes
     # @section -- Workers

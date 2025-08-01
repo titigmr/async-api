@@ -1,0 +1,11 @@
+# Test 2: Configuration minimale pour worker job
+workers:
+  - name: minimal-job
+    type: job
+    enabled: true
+    role:
+      create: false
+    jobSpec:
+      image:
+        repository: "test/worker"
+        tag: "latest"

@@ -1,0 +1,10 @@
+# Test 1: Configuration minimale pour worker deployment
+workers:
+  - name: minimal-deployment
+    type: deployment
+    enabled: true
+    deploymentSpec:
+      replicas: 1
+      image:
+        repository: "test/worker"
+        tag: "latest"

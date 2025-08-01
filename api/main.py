@@ -1,4 +1,3 @@
-# Configuration des logs en premier pour intercepter uvicorn
 from fastapi import FastAPI
 
 from api.api.v1.routes import metrics, services, status, tasks

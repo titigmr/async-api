@@ -5,6 +5,7 @@ from api.repositories.services_config_repository import ServicesConfigRepository
 from api.repositories.task_repository import TaskRepository
 from listener.core.logger import configure_logger, logger
 from listener.core.task_aware_async_session import TaskAwareAsyncSession
+from listener.services.health_check import HealthCheckServer
 from listener.services.message_service import MessageService
 from listener.services.notifier_service import NotificationService
 from listener.services.notifiers.amqp_notifier import AmqpNotifier
@@ -37,10 +38,10 @@ class DIContainer:
         return TaskRepository(self.session())
 
     def http_notifier(self) -> HttpNotifier:
-        return HttpNotifier(self.settings.LISTENER_NOTIFIER_RETRY)
+        return HttpNotifier(max_retries=self.settings.LISTENER_NOTIFIER_RETRY)
 
     def amqp_notifier(self) -> AmqpNotifier:
-        return AmqpNotifier(self.settings.LISTENER_NOTIFIER_RETRY)
+        return AmqpNotifier(max_retries=self.settings.LISTENER_NOTIFIER_RETRY)
 
     def notification_service(self) -> NotificationService:
         return NotificationService(
@@ -60,10 +61,17 @@ class DIContainer:
     def service_repository(self) -> ServicesConfigRepository:
         return ServicesConfigRepository()
 
+    def health_check_server(self) -> HealthCheckServer:
+        return HealthCheckServer(
+            host=self.settings.LISTENER_HEALTH_CHECK_HOST,
+            port=self.settings.LISTENER_HEALTH_CHECK_PORT,
+        )
+
     def app(self) -> QueueListener:
         return QueueListener(
             message_service=self.message_service(),
             service_repository=self.service_repository(),
-            rabbitmq_url=self.settings.broker_url_from_components,
+            broker_kwargs=self.settings.broker_connection_kwargs,
+            health_check_server=self.health_check_server(),
             concurrency=self.settings.LISTENER_CONCURRENCY,
         )

@@ -11,12 +11,19 @@ metadata:
     worker.name: {{ .name }}
     async-api.io/resource-type: configuration
     async-api.io/type: environment
+  annotations:
+    async-api.io/note: "Broker variables are now provided via secrets"
 data:
-  # Broker configuration - individual components for workers
-  BROKER_HOST: {{ include "chart.brokerHost" $ | quote }}
-  BROKER_PORT: {{ include "chart.brokerPort" $ | quote }}
-  BROKER_USERNAME: {{ include "chart.brokerUsername" $ | quote }}
-  BROKER_VHOST: {{ include "chart.brokerVhost" $ | quote }}
-  BROKER_SCHEME: {{ include "chart.brokerScheme" $ | quote }}
+  WORKER_NAME: {{ .name | quote }}
+  WORKER_TYPE: {{ .type | quote }}
+  {{- if (and .deploymentSpec .deploymentSpec.env) }}
+  {{- range .deploymentSpec.env }}
+  {{- if not (hasPrefix "DB_" .name) }}
+  {{- if not (hasPrefix "BROKER_" .name) }}
+  {{ .name }}: {{ tpl .value $ | quote }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
 {{- end }}
 {{- end }}

@@ -33,7 +33,7 @@ spec:
         worker.type: {{ .type }}
         async-api.io/worker-type: {{ .type }}
     spec:
-      {{- if .role.create }}
+      {{- if and .role .role.create }}
       serviceAccountName: {{ printf "%s-worker-%s" (include "helper.fullname" $) .name }}
       {{- end }}
       restartPolicy: Never
@@ -44,15 +44,7 @@ spec:
       containers:
       - name: worker
         image: "{{ .jobSpec.image.repository }}:{{ .jobSpec.image.tag }}"
-        imagePullPolicy: {{ .jobSpec.image.pullPolicy }}
-        {{- if .jobSpec.env }}
-        env:
-        {{- range .jobSpec.env }}
-        - name: {{ .name }}
-          value: {{ tpl .value $ | quote }}
-        {{- end }}
-        {{- end }}
-        {{- if or .jobSpec.envFromSecret .jobSpec.envFromConfigMap }}
+        imagePullPolicy: {{ .jobSpec.image.pullPolicy | default "IfNotPresent" }}
         envFrom:
         {{- range .jobSpec.envFromSecret }}
         - secretRef:
@@ -68,16 +60,62 @@ spec:
             optional: {{ .configMapRef.optional }}
             {{- end }}
         {{- end }}
+        {{- if $.Values.broker.urlFromSecret.name }}
+        - secretRef:
+            name: {{ $.Values.broker.urlFromSecret.name }}
+        {{- else }}
+        {{- if or $.Values.broker.url $.Values.broker.components.host $.Values.rabbitmq.enabled }}
+        - secretRef:
+            name: {{ printf "%s-broker" (include "helper.fullname" $) }}
         {{- end }}
-        {{- if .metrics.enabled }}
+        {{- end }}
+        {{- if and $.Values.rabbitmq.enabled (not $.Values.rabbitmq.auth.password) (not $.Values.broker.urlFromSecret.name) }}
+        - secretRef:
+            name: {{ include "chart.rabbitmq.fullname" $ }}
+        {{- end }}
+        env:
+        {{- if .jobSpec.env }}
+        {{- range .jobSpec.env }}
+        - name: {{ .name }}
+          value: {{ tpl .value $ | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if and (not (and .metrics .metrics.enabled)) .probes }}
+        - name: WORKER_HEALTH_CHECK_HOST
+          value: "0.0.0.0"
+        - name: WORKER_HEALTH_CHECK_PORT
+          value: {{ .probes.port | default "8000" | quote }}
+        {{- end }}
+        {{- if or (and .metrics .metrics.enabled) .probes }}
         ports:
+        {{- if and .metrics .metrics.enabled }}
         - name: metrics
           containerPort: {{ .metrics.port }}
           protocol: TCP
         {{- end }}
+        {{- if and (not (and .metrics .metrics.enabled)) .probes }}
+        - name: health
+          containerPort: {{ .probes.port | default "8000" }}
+          protocol: TCP
+        {{- end }}
+        {{- end }}
         {{- with .jobSpec.resources }}
         resources:
           {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if and (not (and .metrics .metrics.enabled)) .probes }}
+        {{- if .probes.startupProbe }}
+        startupProbe:
+          {{- toYaml .probes.startupProbe | nindent 10 }}
+        {{- end }}
+        {{- if .probes.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .probes.readinessProbe | nindent 10 }}
+        {{- end }}
+        {{- if .probes.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .probes.livenessProbe | nindent 10 }}
+        {{- end }}
         {{- end }}
         {{- if .extraVolumes }}
         volumeMounts:

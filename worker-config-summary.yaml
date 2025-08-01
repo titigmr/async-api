@@ -1,0 +1,41 @@
+# Configuration MINIMALE pour worker deployment
+deployment_minimal:
+  - name: worker-name
+    type: deployment
+    enabled: true
+    deploymentSpec:
+      replicas: 1  # REQUIS
+      image:       # REQUIS
+        repository: "registry/image"
+        tag: "version"
+
+# Configuration MINIMALE pour worker job  
+job_minimal:
+  - name: worker-name
+    type: job
+    enabled: true
+    jobSpec:
+      image:       # REQUIS
+        repository: "registry/image"
+        tag: "version"
+
+# Champs OPTIONNELS (avec valeurs par défaut ou conditionnels)
+optionals:
+  # Pour tous les workers:
+  - role.create: false (par défaut si absent)
+  - metrics.enabled: false (par défaut)
+  - probes: {} (optionnel, activation conditionnelle)
+  
+  # Pour deployment:
+  - deploymentSpec.imagePullPolicy: "IfNotPresent" (par défaut)
+  - deploymentSpec.env: [] (optionnel)
+  - deploymentSpec.resources: {} (optionnel)
+  
+  # Pour job:
+  - jobSpec.imagePullPolicy: "" (par défaut vide)
+  - jobSpec.backoffLimit: optionnel (avec {{- with }})
+  - jobSpec.activeDeadlineSeconds: optionnel
+  - jobSpec.ttlSecondsAfterFinished: optionnel
+  - jobSpec.securityContext: optionnel
+  - jobSpec.env: [] (optionnel)
+  - jobSpec.resources: {} (optionnel)

@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from api.models.task import Task
-from api.schemas.enum import TaskStatus
+from api.schemas.enum import CallbackStatus, TaskStatus
 from listener.services.message_service import MessageService, MessageServiceError
 from listener.services.notifier_service import NotificationException, NotificationService
 
@@ -167,7 +167,7 @@ async def test_process_success_message_with_callback_ok(message_service) -> None
     task = await message_service.task_repository.get_task_by_id("task_found_with_callback", "svc")
     assert task.status == TaskStatus.SUCCESS
     assert task.response == '{"value": 42}'
-    assert task.notification_status == "SUCCESS"
+    assert task.notification_status == CallbackStatus.SUCCESS
 
 
 @pytest.mark.asyncio
@@ -189,7 +189,7 @@ async def test_process_success_message_with_callback_ko(message_service) -> None
     task = await message_service.task_repository.get_task_by_id("task_found_with_callback", "svc")
     assert task.status == TaskStatus.SUCCESS
     assert task.response == '{"value": 42}'
-    assert task.notification_status == "FAILURE"
+    assert task.notification_status == CallbackStatus.FAILURE
 
 
 # ---------------------
@@ -236,7 +236,7 @@ async def test_process_failure_message_with_callback_ok(message_service) -> None
     task = await message_service.task_repository.get_task_by_id("task_found_with_callback", "svc")
     assert task.status == TaskStatus.FAILURE
     assert task.error_message == "Arghh!"
-    assert task.notification_status == "SUCCESS"
+    assert task.notification_status == CallbackStatus.SUCCESS
 
 
 @pytest.mark.asyncio
@@ -258,4 +258,4 @@ async def test_process_failure_message_with_callback_ko(message_service) -> None
     task = await message_service.task_repository.get_task_by_id("task_found_with_callback", "svc")
     assert task.status == TaskStatus.FAILURE
     assert task.error_message == "Arghh!"
-    assert task.notification_status == "FAILURE"
+    assert task.notification_status == CallbackStatus.FAILURE
